@@ -1,0 +1,10 @@
+// Ambiente de desarrollo (configuración Debug).
+#include "Shared.xcconfig"
+
+APP_DISPLAY_NAME = HU Dev
+API_BASE_URL = http:/$()/localhost:3000/api
+SUPABASE_URL =
+SUPABASE_ANON_KEY =
+
+// Valores reales locales (no versionado). Copia Secrets.example.xcconfig.
+#include? "Secrets.xcconfig"

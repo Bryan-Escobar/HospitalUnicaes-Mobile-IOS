@@ -1,0 +1,16 @@
+included:
+  - HospitalUnicaes
+excluded:
+  - build
+  - DerivedData
+disabled_rules:
+  - trailing_comma
+opt_in_rules:
+  - empty_count
+  - force_unwrapping
+line_length:
+  warning: 140
+  error: 200
+identifier_name:
+  excluded:
+    - id

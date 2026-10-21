@@ -1,0 +1,5 @@
+// Ajustes comunes a todos los ambientes.
+// En xcconfig "//" inicia un comentario: las URLs se escriben como https:/$()/host
+
+PRODUCT_BUNDLE_IDENTIFIER = sv.edu.catolica.hospitalunicaes
+IPHONEOS_DEPLOYMENT_TARGET = 17.0
