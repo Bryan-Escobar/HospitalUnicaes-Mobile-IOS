@@ -127,7 +127,7 @@ struct DSTextField: View {
     }
 
     private var borderWidth: CGFloat {
-        isEnabled && (errorMessage != nil || isFocused) ? 2 : 1.5
+        isEnabled && (errorMessage != nil || isFocused) ? 2 : 1
     }
 }
 

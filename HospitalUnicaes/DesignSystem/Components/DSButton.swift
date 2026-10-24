@@ -118,7 +118,7 @@ private struct DSButtonBody: View {
             .background(background, in: shape)
             .overlay {
                 if kind == .secondary {
-                    shape.strokeBorder(borderColor, lineWidth: 1.5)
+                    shape.strokeBorder(borderColor, lineWidth: 1)
                 }
             }
             .contentShape(shape)

@@ -104,6 +104,20 @@ enum DSColor {
 
     static let avatarBackground = Color.dynamic(light: 0xCFFAFE, dark: 0x164E63)
     static let avatarForeground = Color.dynamic(light: 0x155E75, dark: 0xCFFAFE)
+
+    // MARK: Marca UNICAES (Figma 44:747, 44:757)
+
+    /// Colores institucionales del logo y del Splash. No cambian con el modo oscuro.
+    enum Brand {
+        /// Fondo del Splash (`#5A1716`).
+        static let splashBackground = Color(hex: 0x5A1716)
+        /// Texto secundario sobre el Splash (`#F4DCDA`).
+        static let splashText = Color(hex: 0xF4DCDA)
+        /// Granate del logo (`#862524`).
+        static let maroon = Color(hex: 0x862524)
+        /// Dorado del aro del logo, spinner y pie del Splash (`#E8B840`).
+        static let gold = Color(hex: 0xE8B840)
+    }
 }
 
 // MARK: - Tonos de estado
