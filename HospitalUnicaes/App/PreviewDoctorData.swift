@@ -8,6 +8,8 @@ extension DoctorDependencies {
             citas: PreviewCitasService(),
             pacientes: PreviewPacientesService(),
             hospitalizaciones: PreviewHospitalizacionesService(),
+            consultas: PreviewConsultasService(),
+            laboratorio: PreviewLaboratorioService(),
             onIniciarConsulta: { _ in }
         )
     }
@@ -144,6 +146,37 @@ private struct PreviewHospitalizacionesService: HospitalizacionesService {
             fechaIngreso: Date().addingTimeInterval(-6 * 86_400),
             fechaAlta: nil, motivoIngreso: "Observación", estado: .activa
         )
+    }
+}
+
+private struct PreviewConsultasService: ConsultasService {
+    func crearConsulta(_ body: CrearConsultaRequest) async throws -> ConsultaCreada {
+        ConsultaCreada(id: UUID(), citaId: body.citaId, cerradaEn: nil)
+    }
+    func agregarDiagnostico(consultaId: UUID, _ body: CrearDiagnosticoRequest) async throws -> RegistroCreado {
+        RegistroCreado(id: UUID())
+    }
+    func emitirReceta(consultaId: UUID, _ body: CrearRecetaRequest) async throws -> RegistroCreado {
+        RegistroCreado(id: UUID())
+    }
+    func cerrarConsulta(id: UUID) async throws -> ConsultaCreada {
+        ConsultaCreada(id: id, citaId: nil, cerradaEn: "2026-10-25T16:00:00Z")
+    }
+}
+
+private struct PreviewLaboratorioService: LaboratorioService {
+    func examenes() async throws -> [ExamenCatalogo] {
+        [
+            ExamenCatalogo(id: UUID(), nombre: "Hemograma completo", categoria: "Hematología", tipoMuestra: "Sangre"),
+            ExamenCatalogo(
+                id: UUID(uuidString: "dddddddd-dddd-4ddd-8ddd-000000000001") ?? UUID(),
+                nombre: "Prueba cutánea de alergias", categoria: "Alergia", tipoMuestra: nil
+            ),
+        ]
+    }
+
+    func crearOrden(_ body: CrearOrdenRequest) async throws -> OrdenCreada {
+        OrdenCreada(id: UUID(), estado: "pendiente")
     }
 }
 #endif
