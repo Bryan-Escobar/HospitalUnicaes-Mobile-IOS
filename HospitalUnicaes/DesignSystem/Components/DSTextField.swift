@@ -19,6 +19,7 @@ struct DSTextField: View {
     private let errorMessage: String?
     private let isSecure: Bool
     private let axis: Axis
+    private let onFocusChange: ((Bool) -> Void)?
 
     @FocusState private var isFocused: Bool
     @State private var isRevealed = false
@@ -31,7 +32,8 @@ struct DSTextField: View {
         prompt: LocalizedStringKey? = nil,
         errorMessage: String? = nil,
         isSecure: Bool = false,
-        axis: Axis = .horizontal
+        axis: Axis = .horizontal,
+        onFocusChange: ((Bool) -> Void)? = nil
     ) {
         self.label = label
         _text = text
@@ -39,6 +41,7 @@ struct DSTextField: View {
         self.errorMessage = errorMessage
         self.isSecure = isSecure
         self.axis = axis
+        self.onFocusChange = onFocusChange
     }
 
     var body: some View {
@@ -106,6 +109,9 @@ struct DSTextField: View {
         .contentShape(shape)
         .onTapGesture { isFocused = true }
         .animation(.easeOut(duration: 0.15), value: isFocused)
+        .onChange(of: isFocused) { _, focused in
+            onFocusChange?(focused)
+        }
     }
 
     @ViewBuilder
