@@ -8,6 +8,8 @@ extension DoctorDependencies {
             citas: PreviewCitasService(),
             pacientes: PreviewPacientesService(),
             hospitalizaciones: PreviewHospitalizacionesService(),
+            consultas: PreviewConsultasService(),
+            laboratorio: PreviewLaboratorioService(),
             onIniciarConsulta: { _ in }
         )
     }
@@ -19,6 +21,10 @@ enum DoctorPreviewData {
     static let mario = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-000000000003") ?? UUID()
     static let pedro = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-000000000004") ?? UUID()
     static let rosa = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-000000000005") ?? UUID()
+    static let pruebaCutanea = ExamenCatalogo(
+        id: UUID(uuidString: "dddddddd-dddd-4ddd-8ddd-000000000001") ?? UUID(),
+        nombre: "Prueba cutánea de alergias", categoria: "Alergia", tipoMuestra: nil
+    )
     static let doctor = UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-000000000001") ?? UUID()
     static let citaLuis = UUID(uuidString: "cccccccc-cccc-4ccc-8ccc-000000000001") ?? UUID()
 
@@ -143,6 +149,59 @@ private struct PreviewHospitalizacionesService: HospitalizacionesService {
             doctorTratante: DoctorResumen(id: DoctorPreviewData.doctor, nombres: "Ana", apellidos: "Rivas", especialidad: "Alergista"),
             fechaIngreso: Date().addingTimeInterval(-6 * 86_400),
             fechaAlta: nil, motivoIngreso: "Observación", estado: .activa
+        )
+    }
+}
+
+struct PreviewConsultasService: ConsultasService {
+    /// Simula que la API rechaza las recetas, para ver el guardado a medias de iOS-D7.
+    var fallarRecetas = false
+
+    func crearConsulta(_ body: CrearConsultaRequest) async throws -> ConsultaCreada {
+        ConsultaCreada(id: UUID(), citaId: body.citaId, cerradaEn: nil)
+    }
+    func agregarDiagnostico(consultaId: UUID, _ body: CrearDiagnosticoRequest) async throws -> RegistroCreado {
+        RegistroCreado(id: UUID())
+    }
+    func emitirReceta(consultaId: UUID, _ body: CrearRecetaRequest) async throws -> RegistroCreado {
+        if fallarRecetas { throw APIError(statusCode: 500, code: "HTTP_500") }
+        return RegistroCreado(id: UUID())
+    }
+    func cerrarConsulta(id: UUID) async throws -> ConsultaCreada {
+        ConsultaCreada(id: id, citaId: nil, cerradaEn: "2026-10-25T16:00:00Z")
+    }
+}
+
+private struct PreviewLaboratorioService: LaboratorioService {
+    func examenes() async throws -> [ExamenCatalogo] {
+        [
+            ExamenCatalogo(id: UUID(), nombre: "Hemograma completo", categoria: "Hematología", tipoMuestra: "Sangre"),
+            DoctorPreviewData.pruebaCutanea,
+        ]
+    }
+
+    func crearOrden(_ body: CrearOrdenRequest) async throws -> OrdenCreada {
+        OrdenCreada(id: UUID(), estado: "pendiente")
+    }
+}
+
+extension NuevaConsultaContexto {
+    static let preview = NuevaConsultaContexto(
+        pacienteId: DoctorPreviewData.luis,
+        pacienteNombre: "Luis Martínez",
+        citaId: DoctorPreviewData.citaLuis,
+        citaHora: "10:30",
+        motivo: "Control de alergia",
+        alergias: "Penicilina, polen"
+    )
+}
+
+extension NuevaConsultaViewModel {
+    static func preview(fallarRecetas: Bool = false) -> NuevaConsultaViewModel {
+        NuevaConsultaViewModel(
+            contexto: .preview,
+            consultas: PreviewConsultasService(fallarRecetas: fallarRecetas),
+            laboratorio: DoctorDependencies.preview.laboratorio
         )
     }
 }

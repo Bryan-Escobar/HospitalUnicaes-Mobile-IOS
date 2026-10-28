@@ -20,8 +20,13 @@ enum UserFacingError {
         }
     }
 
+    /// `REGLA_DE_NEGOCIO` usa el texto de la API: son mensajes de negocio, sin datos del paciente.
     private static func message(for error: APIError) -> String {
-        codigos[error.code] ?? "El servidor no pudo completar la solicitud. Intenta de nuevo."
+        if error.code == "REGLA_DE_NEGOCIO" {
+            let text = error.message.trimmingCharacters(in: .whitespacesAndNewlines)
+            return text.isEmpty ? "No se pudo completar la operación." : text
+        }
+        return codigos[error.code] ?? "El servidor no pudo completar la solicitud. Intenta de nuevo."
     }
 
     private static let codigos: [String: String] = [
@@ -29,5 +34,10 @@ enum UserFacingError {
         "NO_AUTENTICADO": "Tu sesión expiró. Vuelve a ingresar.",
         "ACCESO_DENEGADO": "No tienes permiso para ver esta información.",
         "NO_ENCONTRADO": "La información solicitada ya no existe.",
+        "CONSULTA_CERRADA": "Esta consulta ya está cerrada y no se puede modificar.",
+        "REGISTRO_DUPLICADO": "Esta cita ya tiene una consulta registrada.",
+        "TRANSICION_INVALIDA": "La cita ya no se puede atender (fue atendida o cancelada).",
+        "REFERENCIA_INVALIDA": "Uno de los datos ya no existe (paciente, cita o examen). Actualiza e intenta de nuevo.",
+        "VALIDACION": "Revisa los datos del formulario.",
     ]
 }
