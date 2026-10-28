@@ -53,6 +53,17 @@ final class DetalleCitaViewModel {
 
     var puedeVerExpediente: Bool { estado == .completo }
 
+    var contextoNuevaConsulta: NuevaConsultaContexto {
+        NuevaConsultaContexto(
+            pacienteId: cita.pacienteId,
+            pacienteNombre: cita.pacienteNombre,
+            citaId: cita.id,
+            citaHora: Formatting.hora(cita.fechaHora),
+            motivo: cita.motivo?.nilIfBlank,
+            alergias: alergias
+        )
+    }
+
     var lineaPaciente: String {
         let edad = Formatting.edad(fechaNacimiento: historial?.paciente.fechaNacimiento)
         let documento = historial?.paciente.documentoIdentidad

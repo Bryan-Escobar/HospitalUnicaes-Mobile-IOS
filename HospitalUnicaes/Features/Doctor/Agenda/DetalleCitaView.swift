@@ -1,11 +1,10 @@
 import SwiftUI
 
-/// iOS-D3 Detalle de cita. "Iniciar consulta" abre un placeholder hasta HUNI-59.
+/// iOS-D3 Detalle de cita. "Iniciar consulta" abre iOS-D7.
 struct DetalleCitaView: View {
     @State private var viewModel: DetalleCitaViewModel
-    @State private var mostrarNuevaConsulta = false
+    @State private var consulta: NuevaConsultaContexto?
     private let dependencies: DoctorDependencies
-    /// HUNI-59: se llama cuando el formulario guarda la consulta (la agenda vuelve a la raíz y recarga).
     private let onConsultaGuardada: () -> Void
     @Environment(\.dismiss) private var dismiss
 
@@ -33,8 +32,17 @@ struct DetalleCitaView: View {
         .task { await viewModel.recargar() }
         .refreshable { await viewModel.recargar() }
         // HUNI-59: abrir iOS-D7
-        .sheet(isPresented: $mostrarNuevaConsulta) {
-            NuevaConsultaPlaceholder()
+        .fullScreenCover(item: $consulta, onDismiss: {
+            Task { await viewModel.recargar() }
+        }) { contexto in
+            NuevaConsultaView(
+                viewModel: NuevaConsultaViewModel(
+                    contexto: contexto,
+                    consultas: dependencies.consultas,
+                    laboratorio: dependencies.laboratorio
+                ),
+                onGuardada: onConsultaGuardada
+            )
         }
     }
 
@@ -165,28 +173,6 @@ struct DetalleCitaView: View {
 
     private func iniciarConsulta() {
         dependencies.onIniciarConsulta(viewModel.cita)
-        mostrarNuevaConsulta = true
-    }
-}
-
-private struct NuevaConsultaPlaceholder: View {
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            ContentUnavailableView(
-                "Disponible pronto",
-                systemImage: "stethoscope",
-                description: Text("El registro de la consulta llega con HUNI-59.")
-            )
-            .navigationTitle("Nueva consulta")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cerrar") { dismiss() }
-                }
-            }
-        }
-        .presentationDetents([.medium])
+        consulta = viewModel.contextoNuevaConsulta
     }
 }
