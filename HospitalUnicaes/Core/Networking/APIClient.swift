@@ -61,6 +61,7 @@ struct APIClient {
     static let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
+        decoder.dateDecodingStrategy = .custom { try decodeISO8601($0) }
         return decoder
     }()
 
@@ -77,12 +78,13 @@ struct APIClient {
     func send<Response: Decodable>(
         _ method: Method,
         _ path: String,
+        query: [URLQueryItem] = [],
         body: (some Encodable)? = String?.none,
         authenticated: Bool = true
     ) async throws -> Response {
         guard let baseURL else { throw APIClientError.missingBaseURL }
 
-        var request = URLRequest(url: baseURL.appendingPathComponent(path))
+        var request = URLRequest(url: try url(baseURL: baseURL, path: path, query: query))
         request.httpMethod = method.rawValue
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if authenticated {
@@ -106,5 +108,65 @@ struct APIClient {
 
     private struct Envelope<T: Decodable>: Decodable {
         let data: T
+    }
+
+    private func url(baseURL: URL, path: String, query: [URLQueryItem]) throws -> URL {
+        let joined = baseURL.appendingPathComponent(path)
+        guard !query.isEmpty else { return joined }
+        guard var components = URLComponents(url: joined, resolvingAgainstBaseURL: false) else {
+            throw APIClientError.invalidResponse
+        }
+        components.queryItems = query
+        guard let composed = components.url else { throw APIClientError.invalidResponse }
+        return composed
+    }
+
+    /// ISO 8601 con o sin milisegundos. `AAAA-MM-DD` se interpreta como inicio del día en El Salvador.
+    private static func decodeISO8601(_ decoder: Decoder) throws -> Date {
+        let container = try decoder.singleValueContainer()
+        let value = try container.decode(String.self)
+        if let date = ISO8601Parser.date(from: value) {
+            return date
+        }
+        throw DecodingError.dataCorruptedError(
+            in: container,
+            debugDescription: "Fecha inválida"
+        )
+    }
+}
+
+/// Fechas del contrato: instante ISO 8601, o día de calendario `AAAA-MM-DD`.
+enum ISO8601Parser {
+    static func date(from value: String) -> Date? {
+        if let instant = instant(value, fractional: true) { return instant }
+        if let instant = instant(value, fractional: false) { return instant }
+        return calendarDay(value)
+    }
+
+    private static let fractional: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    private static let plain: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+
+    private static func instant(_ value: String, fractional: Bool) -> Date? {
+        (fractional ? Self.fractional : plain).date(from: value)
+    }
+
+    /// Medianoche en `America/El_Salvador` para que un día de calendario no cambie de fecha al mostrarse.
+    private static func calendarDay(_ value: String) -> Date? {
+        let parts = value.split(separator: "-")
+        guard parts.count == 3, let year = Int(parts[0]), let month = Int(parts[1]), let day = Int(parts[2]) else {
+            return nil
+        }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/El_Salvador") ?? .gmt
+        return calendar.date(from: DateComponents(year: year, month: month, day: day))
     }
 }
