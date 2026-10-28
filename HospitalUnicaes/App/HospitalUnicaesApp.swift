@@ -14,10 +14,12 @@ struct HospitalUnicaesApp: App {
             return
         }
         #endif
-        let authService = SupabaseAuthService()
+        let supabase = SupabaseClientFactory.make()
+        let authService = SupabaseAuthService(client: supabase)
+        let apiClient = APIClient { try await authService.accessToken() }
         let meService: MeService = AppConfig.useMockMe
             ? MockMeService(authService: authService)
-            : APIMeService(client: APIClient { try await authService.accessToken() })
+            : APIMeService(client: apiClient)
         _session = State(initialValue: SessionViewModel(authService: authService, meService: meService))
     }
 
