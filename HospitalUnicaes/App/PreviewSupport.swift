@@ -20,6 +20,12 @@ struct PreviewAuthService: AuthService {
     func sessionEvents() -> AsyncStream<AuthSessionEvent> { AsyncStream { $0.finish() } }
 }
 
+struct PreviewHealthService: HealthService {
+    func check() async throws -> HealthStatus {
+        HealthStatus(status: "ok", timestamp: "2026-10-27T12:00:00.000Z", uptime: 120, database: .up)
+    }
+}
+
 extension Me {
     static let previewDoctor = MockMeService.me(email: "doctor@demo.hospitalunicaes.test")
     static let previewPaciente = MockMeService.me(email: "paciente@demo.hospitalunicaes.test")

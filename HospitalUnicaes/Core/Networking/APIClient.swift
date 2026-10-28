@@ -21,25 +21,33 @@ struct APIError: Error, Equatable, Decodable {
     }
 
     var isUnauthorized: Bool { statusCode == 401 }
+    var isForbidden: Bool { statusCode == 403 }
+    var isServerError: Bool { statusCode >= 500 }
 }
 
+/// Fallas del lado del cliente: nunca llegó una respuesta de la API que se pueda interpretar.
 enum APIClientError: LocalizedError {
     case missingBaseURL
     case notAuthenticated
     case invalidResponse
+    /// La API respondió 2xx pero el cuerpo no coincide con el DTO esperado.
+    case decoding(DecodingError)
 
     var errorDescription: String? {
         switch self {
         case .missingBaseURL: "La URL de la API no está configurada (API_BASE_URL)."
         case .notAuthenticated: "No hay una sesión activa."
         case .invalidResponse: "La respuesta del servidor no es válida."
+        case .decoding: "La respuesta del servidor no tiene el formato esperado."
         }
     }
 }
 
-/// Cliente HTTP mínimo del backend unificado. Inyecta `Authorization: Bearer` con el token
+/// Cliente HTTP del backend unificado. Inyecta `Authorization: Bearer` con el token
 /// de la sesión de Supabase y desenvuelve la respuesta estándar `{ data }`.
-/// HUNI-24 lo amplía (reintentos, paginación, logs).
+///
+/// `path` se agrega a `API_BASE_URL` (`auth/me` → `…/api/auth/me`); si empieza con `/`
+/// es relativo a la raíz del servidor (`/health` → `…/health`, fuera de `/api`).
 struct APIClient {
     enum Method: String {
         case get = "GET"
@@ -82,7 +90,7 @@ struct APIClient {
     ) async throws -> Response {
         guard let baseURL else { throw APIClientError.missingBaseURL }
 
-        var request = URLRequest(url: baseURL.appendingPathComponent(path))
+        var request = URLRequest(url: try url(baseURL: baseURL, path: path))
         request.httpMethod = method.rawValue
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if authenticated {
@@ -98,13 +106,26 @@ struct APIClient {
         guard let http = response as? HTTPURLResponse else { throw APIClientError.invalidResponse }
 
         guard (200..<300).contains(http.statusCode) else {
+            // Un proxy (502/504) o un error no controlado puede responder sin el JSON estándar.
             throw (try? Self.decoder.decode(APIError.self, from: data))
                 ?? APIError(statusCode: http.statusCode, code: "HTTP_\(http.statusCode)")
         }
-        return try Self.decoder.decode(Envelope<Response>.self, from: data).data
+        do {
+            return try Self.decoder.decode(Envelope<Response>.self, from: data).data
+        } catch let error as DecodingError {
+            throw APIClientError.decoding(error)
+        }
     }
 
     private struct Envelope<T: Decodable>: Decodable {
         let data: T
+    }
+
+    private func url(baseURL: URL, path: String) throws -> URL {
+        guard path.hasPrefix("/") else { return baseURL.appendingPathComponent(path) }
+        guard let url = URL(string: path, relativeTo: baseURL)?.absoluteURL else {
+            throw APIClientError.missingBaseURL
+        }
+        return url
     }
 }
