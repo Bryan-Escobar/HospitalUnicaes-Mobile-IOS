@@ -1,22 +1,13 @@
 import SwiftUI
 
-/// Pestaña del armazón: título y vista vacía hasta que HUNI-42 la llene.
-struct PlaceholderTabView: View {
-    let title: String
-    let systemImage: String
+/// Pestañas del doctor; Inicio las abre desde sus tarjetas.
+enum DoctorTab: Hashable {
+    case inicio, agenda, pacientes, turnos, perfil
+}
 
-    var body: some View {
-        NavigationStack {
-            ContentUnavailableView(
-                title,
-                systemImage: systemImage,
-                description: Text("Esta sección estará disponible pronto.")
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(DSColor.backgroundGrouped)
-            .navigationTitle(title)
-        }
-    }
+/// Pestañas del paciente.
+enum PacienteTab: Hashable {
+    case inicio, citas, miSalud, ambulancia, perfil
 }
 
 /// Ícono de contorno como en el Figma (iOS rellena los íconos de la TabBar por defecto).
@@ -33,20 +24,26 @@ private struct TabLabel: View {
 /// TabView Doctor: Inicio · Agenda · Pacientes · Turnos · Perfil (Figma 44:1115).
 struct DoctorTabView: View {
     let me: Me
+    @State private var tab: DoctorTab = .inicio
     @Environment(\.doctorDependencies) private var dependencies
 
     var body: some View {
-        TabView {
-            PlaceholderTabView(title: "Inicio", systemImage: "house")
+        TabView(selection: $tab) {
+            DoctorInicioView(me: me) { tab = $0 }
                 .tabItem { TabLabel(title: "Inicio", systemImage: "house") }
+                .tag(DoctorTab.inicio)
             AgendaView(dependencies: dependencies)
                 .tabItem { TabLabel(title: "Agenda", systemImage: "calendar") }
+                .tag(DoctorTab.agenda)
             PacientesView(dependencies: dependencies)
                 .tabItem { TabLabel(title: "Pacientes", systemImage: "person.2") }
-            PlaceholderTabView(title: "Turnos", systemImage: "clock")
+                .tag(DoctorTab.pacientes)
+            TurnosView()
                 .tabItem { TabLabel(title: "Turnos", systemImage: "clock") }
+                .tag(DoctorTab.turnos)
             PerfilView(viewModel: PerfilViewModel(me: me))
                 .tabItem { TabLabel(title: "Perfil", systemImage: "person.crop.circle") }
+                .tag(DoctorTab.perfil)
         }
         .tint(DSColor.tint)
     }
@@ -55,19 +52,29 @@ struct DoctorTabView: View {
 /// TabView Paciente: Inicio · Citas · Mi salud · Ambulancia · Perfil.
 struct PacienteTabView: View {
     let me: Me
+    @State private var tab: PacienteTab = .inicio
+    @State private var miSalud = MiSaludViewModel()
 
     var body: some View {
-        TabView {
-            PlaceholderTabView(title: "Inicio", systemImage: "house")
-                .tabItem { TabLabel(title: "Inicio", systemImage: "house") }
-            PlaceholderTabView(title: "Citas", systemImage: "calendar")
+        TabView(selection: $tab) {
+            PacienteInicioView(me: me) { destino, segmento in
+                if let segmento { miSalud.segmento = segmento }
+                tab = destino
+            }
+            .tabItem { TabLabel(title: "Inicio", systemImage: "house") }
+            .tag(PacienteTab.inicio)
+            CitasPacienteView()
                 .tabItem { TabLabel(title: "Citas", systemImage: "calendar") }
-            PlaceholderTabView(title: "Mi salud", systemImage: "heart.text.square")
+                .tag(PacienteTab.citas)
+            MiSaludView(viewModel: miSalud)
                 .tabItem { TabLabel(title: "Mi salud", systemImage: "heart.text.square") }
-            PlaceholderTabView(title: "Ambulancia", systemImage: "light.beacon.max")
+                .tag(PacienteTab.miSalud)
+            AmbulanciaPacienteView()
                 .tabItem { TabLabel(title: "Ambulancia", systemImage: "light.beacon.max") }
+                .tag(PacienteTab.ambulancia)
             PerfilView(viewModel: PerfilViewModel(me: me))
                 .tabItem { TabLabel(title: "Perfil", systemImage: "person.crop.circle") }
+                .tag(PacienteTab.perfil)
         }
         .tint(DSColor.tint)
     }
