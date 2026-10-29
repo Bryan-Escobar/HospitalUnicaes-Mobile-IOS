@@ -33,15 +33,16 @@ private struct TabLabel: View {
 /// TabView Doctor: Inicio · Agenda · Pacientes · Turnos · Perfil (Figma 44:1115).
 struct DoctorTabView: View {
     let me: Me
+    @Environment(\.doctorDependencies) private var dependencies
     @Environment(\.healthService) private var health
 
     var body: some View {
         TabView {
             PlaceholderTabView(title: "Inicio", systemImage: "house")
                 .tabItem { TabLabel(title: "Inicio", systemImage: "house") }
-            PlaceholderTabView(title: "Agenda", systemImage: "calendar")
+            AgendaView(dependencies: dependencies)
                 .tabItem { TabLabel(title: "Agenda", systemImage: "calendar") }
-            PlaceholderTabView(title: "Pacientes", systemImage: "person.2")
+            PacientesView(dependencies: dependencies)
                 .tabItem { TabLabel(title: "Pacientes", systemImage: "person.2") }
             PlaceholderTabView(title: "Turnos", systemImage: "clock")
                 .tabItem { TabLabel(title: "Turnos", systemImage: "clock") }
@@ -77,6 +78,7 @@ struct PacienteTabView: View {
 #Preview("Doctor") {
     DoctorTabView(me: .previewDoctor)
         .environment(SessionViewModel.preview())
+        .environment(\.doctorDependencies, .preview)
 }
 
 #Preview("Paciente") {

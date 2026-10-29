@@ -39,8 +39,14 @@ extension DSStatus {
 
     // Cita
     static let citaProgramada = DSStatus(domain: "Cita", title: "Programada", systemImage: nil, tone: .info)
+    static let citaConfirmada = DSStatus(
+        domain: "Cita", title: "Confirmada", systemImage: "checkmark.circle", tone: .info
+    )
     static let citaAtendida = DSStatus(domain: "Cita", title: "Atendida", systemImage: "checkmark", tone: .success)
     static let citaCancelada = DSStatus(domain: "Cita", title: "Cancelada", systemImage: "xmark", tone: .neutral)
+    static let citaNoAsistio = DSStatus(
+        domain: "Cita", title: "No asistió", systemImage: "person.fill.xmark", tone: .neutral
+    )
 
     // Solicitud de cita o ambulancia
     static let solicitudEnviada = DSStatus(domain: "Solicitud", title: "Enviada", systemImage: "circle", tone: .warning)
@@ -61,7 +67,7 @@ extension DSStatus {
         labPendiente, labEnProceso, labCompletado,
         ambulanciaDisponible, ambulanciaEnServicio, ambulanciaEnMantenimiento,
         camaLibre, camaOcupada, camaElegida,
-        citaProgramada, citaAtendida, citaCancelada,
+        citaProgramada, citaConfirmada, citaAtendida, citaCancelada, citaNoAsistio,
         solicitudEnviada, solicitudRechazada,
         bitacoraFinalizado, stockBajo,
         avisoVigente, avisoProgramado, avisoVencido,

@@ -118,6 +118,12 @@ struct APIClientNetworkingTests {
             statusCode: 403,
             body: #"{"statusCode":403,"success":false,"code":"ACCESO_DENEGADO","message":"Sin permiso"}"#,
             code: "ACCESO_DENEGADO",
+            message: "No tienes permiso para ver esta información."
+        ),
+        ErrorCase(
+            statusCode: 403,
+            body: "<html><body>403 Forbidden</body></html>",
+            code: "HTTP_403",
             message: "No tienes permiso para realizar esta acción."
         ),
         ErrorCase(

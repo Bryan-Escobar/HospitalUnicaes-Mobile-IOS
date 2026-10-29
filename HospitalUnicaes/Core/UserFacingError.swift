@@ -21,7 +21,12 @@ enum UserFacingError {
     }
 
     /// Primero el `code` exacto; si la app no lo conoce (o el cuerpo no era JSON), la categoría HTTP.
+    /// `REGLA_DE_NEGOCIO` usa el texto de la API: son mensajes de negocio, sin datos del paciente.
     private static func message(for error: APIError) -> String {
+        if error.code == "REGLA_DE_NEGOCIO" {
+            let text = error.message.trimmingCharacters(in: .whitespacesAndNewlines)
+            return text.isEmpty ? "No se pudo completar la operación." : text
+        }
         if let text = codigos[error.code] { return text }
         switch error.statusCode {
         case 401:
@@ -58,5 +63,13 @@ enum UserFacingError {
     private static let codigos: [String: String] = [
         "PERFIL_INCOMPLETO": "Tu cuenta no tiene un perfil de paciente o de personal. Contacta a recepción.",
         "CUENTA_INACTIVA": "Tu cuenta está desactivada. Contacta a la administración del hospital.",
+        "NO_AUTENTICADO": "Tu sesión expiró. Vuelve a ingresar.",
+        "ACCESO_DENEGADO": "No tienes permiso para ver esta información.",
+        "NO_ENCONTRADO": "La información solicitada ya no existe.",
+        "CONSULTA_CERRADA": "Esta consulta ya está cerrada y no se puede modificar.",
+        "REGISTRO_DUPLICADO": "Esta cita ya tiene una consulta registrada.",
+        "TRANSICION_INVALIDA": "La cita ya no se puede atender (fue atendida o cancelada).",
+        "REFERENCIA_INVALIDA": "Uno de los datos ya no existe (paciente, cita o examen). Actualiza e intenta de nuevo.",
+        "VALIDACION": "Revisa los datos del formulario.",
     ]
 }

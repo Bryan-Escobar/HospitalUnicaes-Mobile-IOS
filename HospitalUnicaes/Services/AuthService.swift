@@ -8,8 +8,8 @@ enum AuthSessionEvent: Equatable {
     case signedOut
 }
 
-/// Autenticación. De Supabase solo se usa Auth: los datos de negocio
-/// se piden al backend unificado (HospitalUnicaes-Api).
+/// Autenticación con Supabase Auth. Las citas del doctor se leen de `v_citas`
+/// con el mismo cliente (PostgREST, HUNI-51); el resto de datos va a la API.
 protocol AuthService: Sendable {
     /// Usuario de la sesión guardada en Keychain, refrescando el token si hace falta.
     /// `nil` si no hay sesión guardada; lanza `AuthServiceError.sessionExpired` si la había
@@ -51,23 +51,13 @@ enum AuthServiceError: LocalizedError, Equatable {
 final class SupabaseAuthService: AuthService {
     private let client: SupabaseClient?
 
-    init() {
-        if let url = AppConfig.supabaseURL, let key = AppConfig.supabaseAnonKey {
-            client = SupabaseClient(
-                supabaseURL: url,
-                supabaseKey: key,
-                options: SupabaseClientOptions(
-                    auth: .init(
-                        // La sesión (access + refresh token) vive en el Keychain del dispositivo.
-                        storage: KeychainLocalStorage(service: "sv.edu.catolica.hospitalunicaes.auth"),
-                        // Emite la sesión guardada al instante; `currentUser()` la valida aparte.
-                        emitLocalSessionAsInitialSession: true
-                    )
-                )
-            )
-        } else {
-            client = nil
-        }
+    init(client: SupabaseClient?) {
+        self.client = client
+    }
+
+    /// Conveniencia para previews y llamadas que no comparten el cliente de citas.
+    convenience init() {
+        self.init(client: SupabaseClientFactory.make())
     }
 
     func currentUser() async throws -> AppUser? {
