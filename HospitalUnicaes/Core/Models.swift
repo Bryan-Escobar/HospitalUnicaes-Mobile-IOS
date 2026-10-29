@@ -102,3 +102,19 @@ struct RegistroPacienteRequest: Codable, Equatable {
     /// Se guarda en `expedientes.alergias` (HUNI-96).
     var alergias: String?
 }
+
+/// Respuesta de `GET /health` (contrato `HealthStatus`, HUNI-17). El servidor responde 200
+/// aunque la BD esté caída; `database` dice si está disponible.
+struct HealthStatus: Decodable, Equatable {
+    enum Database: String, Decodable {
+        case up
+        case down
+    }
+
+    let status: String
+    /// Instante ISO 8601 del servidor.
+    let timestamp: String
+    /// Segundos desde que arrancó el proceso.
+    let uptime: Double
+    let database: Database
+}

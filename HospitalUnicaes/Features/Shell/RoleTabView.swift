@@ -26,6 +26,7 @@ struct DoctorTabView: View {
     let me: Me
     @State private var tab: DoctorTab = .inicio
     @Environment(\.doctorDependencies) private var dependencies
+    @Environment(\.healthService) private var health
 
     var body: some View {
         TabView(selection: $tab) {
@@ -41,7 +42,7 @@ struct DoctorTabView: View {
             TurnosView()
                 .tabItem { TabLabel(title: "Turnos", systemImage: "clock") }
                 .tag(DoctorTab.turnos)
-            PerfilView(viewModel: PerfilViewModel(me: me))
+            PerfilView(viewModel: PerfilViewModel(me: me, health: health))
                 .tabItem { TabLabel(title: "Perfil", systemImage: "person.crop.circle") }
                 .tag(DoctorTab.perfil)
         }
@@ -54,6 +55,7 @@ struct PacienteTabView: View {
     let me: Me
     @State private var tab: PacienteTab = .inicio
     @State private var miSalud = MiSaludViewModel()
+    @Environment(\.healthService) private var health
 
     var body: some View {
         TabView(selection: $tab) {
@@ -72,7 +74,7 @@ struct PacienteTabView: View {
             AmbulanciaPacienteView()
                 .tabItem { TabLabel(title: "Ambulancia", systemImage: "light.beacon.max") }
                 .tag(PacienteTab.ambulancia)
-            PerfilView(viewModel: PerfilViewModel(me: me))
+            PerfilView(viewModel: PerfilViewModel(me: me, health: health))
                 .tabItem { TabLabel(title: "Perfil", systemImage: "person.crop.circle") }
                 .tag(PacienteTab.perfil)
         }

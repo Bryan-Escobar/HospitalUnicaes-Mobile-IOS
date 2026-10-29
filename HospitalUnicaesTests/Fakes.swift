@@ -60,6 +60,19 @@ final class FakeMeService: MeService, @unchecked Sendable {
     }
 }
 
+/// HealthService en memoria.
+final class FakeHealthService: HealthService, @unchecked Sendable {
+    var result: Result<HealthStatus, Error> = .success(.fixture(database: .up))
+
+    func check() async throws -> HealthStatus { try result.get() }
+}
+
+extension HealthStatus {
+    static func fixture(database: Database) -> HealthStatus {
+        HealthStatus(status: "ok", timestamp: "2026-10-27T12:00:00.000Z", uptime: 10, database: database)
+    }
+}
+
 extension Me {
     static func fixture(rol: UserRole, especialidad: String? = nil) -> Me {
         Me(

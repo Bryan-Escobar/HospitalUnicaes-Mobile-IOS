@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// iOS-C7 Perfil (Figma 44:1060). En HUNI-39 solo cabecera, datos y cerrar sesión;
-/// Notificaciones y Accesibilidad quedan visibles sin acción.
+/// Notificaciones y Accesibilidad quedan visibles sin acción. HUNI-24 agrega el estado del servidor.
 struct PerfilView: View {
     @State var viewModel: PerfilViewModel
     @Environment(SessionViewModel.self) private var session
@@ -12,6 +12,7 @@ struct PerfilView: View {
                 VStack(spacing: DSSpacing.medium) {
                     header
                     datos
+                    servidor
                     ajustes
                     DSButton(
                         "Cerrar sesión",
@@ -29,6 +30,7 @@ struct PerfilView: View {
             }
             .background(DSColor.backgroundGrouped)
             .navigationTitle("Perfil")
+            .task { await viewModel.checkServer() }
             .confirmationDialog(
                 "¿Cerrar sesión?",
                 isPresented: $viewModel.isConfirmingSignOut,
@@ -104,6 +106,51 @@ struct PerfilView: View {
             .foregroundStyle(DSColor.textPrimary)
     }
 
+    private var servidor: some View {
+        Button {
+            Task { await viewModel.checkServer() }
+        } label: {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: DSSpacing.medium) {
+                    Text("Servidor del hospital")
+                        .font(DSFont.bodySecondaryEmphasis)
+                        .foregroundStyle(DSColor.textPrimary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if viewModel.serverStatus == .checking {
+                        ProgressView()
+                    } else {
+                        DSStatusBadge(serverBadge)
+                    }
+                }
+                if case .offline(let message) = viewModel.serverStatus {
+                    Text(message)
+                        .font(DSFont.bodySecondary)
+                        .foregroundStyle(DSColor.textSecondary)
+                }
+            }
+            .padding(.vertical, 12)
+            .frame(minHeight: 52)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(viewModel.serverStatus == .checking)
+        .padding(.horizontal, DSSpacing.regular)
+        .dsCardBackground()
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Toca para volver a verificar")
+    }
+
+    private var serverBadge: DSStatus {
+        switch viewModel.serverStatus {
+        case .online, .checking:
+            DSStatus(domain: "Servidor", title: "En línea", systemImage: "checkmark", tone: .success)
+        case .degraded:
+            DSStatus(domain: "Servidor", title: "Sin base de datos", systemImage: "exclamationmark.triangle", tone: .warning)
+        case .offline:
+            DSStatus(domain: "Servidor", title: "Sin conexión", systemImage: "wifi.slash", tone: .danger)
+        }
+    }
+
     private var ajustes: some View {
         VStack(spacing: 0) {
             ajusteRow("Notificaciones")
@@ -138,12 +185,12 @@ struct PerfilView: View {
 }
 
 #Preview("Perfil · doctor") {
-    PerfilView(viewModel: PerfilViewModel(me: .previewDoctor))
+    PerfilView(viewModel: PerfilViewModel(me: .previewDoctor, health: PreviewHealthService()))
         .environment(SessionViewModel.preview())
 }
 
 #Preview("Perfil · paciente oscuro") {
-    PerfilView(viewModel: PerfilViewModel(me: .previewPaciente))
+    PerfilView(viewModel: PerfilViewModel(me: .previewPaciente, health: PreviewHealthService()))
         .environment(SessionViewModel.preview())
         .preferredColorScheme(.dark)
 }
