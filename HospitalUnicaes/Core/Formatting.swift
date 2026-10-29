@@ -52,6 +52,17 @@ enum Formatting {
         calendar.isDate(lhs, inSameDayAs: rhs)
     }
 
+    /// `dia` a la hora local indicada ("10:30" de ese día en El Salvador).
+    static func fecha(_ dia: Date, hora: Int, minuto: Int = 0) -> Date {
+        calendar.date(bySettingHour: hora, minute: minuto, second: 0, of: startOfDay(dia)) ?? dia
+    }
+
+    /// "Miércoles 21 de octubre", subtítulo de Inicio.
+    static func fechaLarga(_ date: Date) -> String {
+        let texto = texto(date, formato: "EEEE d 'de' MMMM")
+        return texto.prefix(1).uppercased() + texto.dropFirst()
+    }
+
     static func hora(_ date: Date) -> String {
         texto(date, formato: "HH:mm")
     }
