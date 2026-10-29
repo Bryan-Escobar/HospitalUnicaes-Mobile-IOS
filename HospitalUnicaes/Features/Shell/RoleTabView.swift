@@ -34,6 +34,7 @@ private struct TabLabel: View {
 struct DoctorTabView: View {
     let me: Me
     @Environment(\.doctorDependencies) private var dependencies
+    @Environment(\.healthService) private var health
 
     var body: some View {
         TabView {
@@ -45,7 +46,7 @@ struct DoctorTabView: View {
                 .tabItem { TabLabel(title: "Pacientes", systemImage: "person.2") }
             PlaceholderTabView(title: "Turnos", systemImage: "clock")
                 .tabItem { TabLabel(title: "Turnos", systemImage: "clock") }
-            PerfilView(viewModel: PerfilViewModel(me: me))
+            PerfilView(viewModel: PerfilViewModel(me: me, health: health))
                 .tabItem { TabLabel(title: "Perfil", systemImage: "person.crop.circle") }
         }
         .tint(DSColor.tint)
@@ -55,6 +56,7 @@ struct DoctorTabView: View {
 /// TabView Paciente: Inicio · Citas · Mi salud · Ambulancia · Perfil.
 struct PacienteTabView: View {
     let me: Me
+    @Environment(\.healthService) private var health
 
     var body: some View {
         TabView {
@@ -66,7 +68,7 @@ struct PacienteTabView: View {
                 .tabItem { TabLabel(title: "Mi salud", systemImage: "heart.text.square") }
             PlaceholderTabView(title: "Ambulancia", systemImage: "light.beacon.max")
                 .tabItem { TabLabel(title: "Ambulancia", systemImage: "light.beacon.max") }
-            PerfilView(viewModel: PerfilViewModel(me: me))
+            PerfilView(viewModel: PerfilViewModel(me: me, health: health))
                 .tabItem { TabLabel(title: "Perfil", systemImage: "person.crop.circle") }
         }
         .tint(DSColor.tint)
