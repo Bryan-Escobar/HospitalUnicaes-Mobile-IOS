@@ -1,0 +1,102 @@
+name: iOS CI
+
+on:
+  push:
+    branches: [development, staging, prod]
+  pull_request:
+    branches: [development, staging, prod]
+  workflow_dispatch:
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  # Filtro de rutas a nivel de job (no en `on.paths`): si el workflow entero se
+  # salta, un check requerido queda "pending" y bloquea el PR. Un job saltado por
+  # `if` cuenta como exitoso, así los PRs que solo tocan docs se pueden mergear.
+  cambios:
+    name: Detectar cambios
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.filtro.outputs.app }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v4
+        id: filtro
+        if: github.event_name != 'workflow_dispatch'
+        with:
+          filters: |
+            app:
+              - 'HospitalUnicaes/**'
+              - 'HospitalUnicaesTests/**'
+              - 'HospitalUnicaes.xcodeproj/**'
+              - 'Config/**'
+              - '.swiftlint.yml'
+              - '.github/workflows/ios.yml'
+
+  build-test:
+    name: Build, tests y SwiftLint (iOS)
+    needs: cambios
+    if: github.event_name == 'workflow_dispatch' || needs.cambios.outputs.app == 'true'
+    runs-on: macos-26
+    timeout-minutes: 40
+    env:
+      XCODE_APP: /Applications/Xcode_26.6.app
+      SPM_DIR: .spm
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Seleccionar Xcode
+        run: |
+          sudo xcode-select -s "$XCODE_APP"
+          xcodebuild -version
+
+      - name: Instalar SwiftLint
+        run: command -v swiftlint >/dev/null || brew install swiftlint
+
+      - name: SwiftLint
+        run: swiftlint lint --reporter github-actions-logging
+
+      - name: Cache de Swift Package Manager
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.SPM_DIR }}
+          key: spm-${{ runner.os }}-${{ hashFiles('HospitalUnicaes.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      # Config/Secrets.xcconfig no existe en CI: Dev.xcconfig lo incluye con
+      # `#include?`, así que compila con valores vacíos y USE_MOCK_ME = YES.
+      - name: Elegir simulador
+        run: |
+          id=$(xcodebuild -project HospitalUnicaes.xcodeproj -scheme HospitalUnicaes \
+                 -clonedSourcePackagesDirPath "$SPM_DIR" -showdestinations 2>/dev/null \
+               | grep 'platform:iOS Simulator' | grep 'name:iPhone' | head -1 \
+               | sed -E 's/.*id:([^,]+),.*/\1/')
+          if [ -z "$id" ]; then echo "::error::No hay simulador de iPhone disponible"; exit 1; fi
+          echo "SIM_ID=$id" >> "$GITHUB_ENV"
+          echo "Simulador: $id"
+
+      - name: xcodebuild build test
+        run: |
+          set -o pipefail
+          xcodebuild build test \
+            -project HospitalUnicaes.xcodeproj \
+            -scheme HospitalUnicaes \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=$SIM_ID" \
+            -clonedSourcePackagesDirPath "$SPM_DIR" \
+            -resultBundlePath TestResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Subir resultados de tests
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-test-results
+          path: TestResults.xcresult
+          retention-days: 7
