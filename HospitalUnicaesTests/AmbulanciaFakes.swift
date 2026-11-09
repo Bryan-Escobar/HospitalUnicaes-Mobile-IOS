@@ -89,11 +89,3 @@ enum AmbulanciaFixtures {
         )
     }
 }
-
-/// Espera a que `condicion` se cumpla dejando correr las Tasks pendientes (máx. ~2 s).
-@MainActor
-func esperar(_ condicion: () -> Bool) async {
-    for _ in 0..<200 where !condicion() {
-        try? await Task.sleep(for: .milliseconds(10))
-    }
-}

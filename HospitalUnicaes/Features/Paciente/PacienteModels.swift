@@ -26,17 +26,6 @@ struct RecetaPaciente: Hashable, Identifiable {
     let indicacion: String
 }
 
-struct ResultadoLaboratorio: Hashable, Identifiable {
-    let id = UUID()
-    let examen: String
-    let doctor: String
-    let fecha: Date
-    let estado: EstadoLaboratorio
-    /// Texto del resultado; solo cuando la orden está Completada.
-    let resultado: String?
-    let archivo: String?
-}
-
 struct ConsultaPaciente: Hashable, Identifiable {
     let id = UUID()
     let fecha: Date
@@ -44,7 +33,7 @@ struct ConsultaPaciente: Hashable, Identifiable {
     let doctor: String
     let especialidad: String
     let recetas: [RecetaPaciente]
-    let ordenes: [ResultadoLaboratorio]
+    let ordenes: [ExamenLaboratorioPaciente]
 }
 
 struct HabitacionPaciente: Hashable {
@@ -61,7 +50,7 @@ struct HabitacionPaciente: Hashable {
 enum PacienteRoute: Hashable {
     case cita(CitaPaciente)
     case consulta(ConsultaPaciente)
-    case resultado(ResultadoLaboratorio)
+    case resultado(ExamenLaboratorioPaciente)
 }
 
 enum PacienteMuestra {
@@ -104,41 +93,53 @@ enum PacienteMuestra {
         preferencia: "lunes por la mañana"
     )
 
-    static func resultados(hoy: Date) -> [ResultadoLaboratorio] {
+    static func resultados(hoy: Date) -> [ExamenLaboratorioPaciente] {
         [
-            ResultadoLaboratorio(
-                examen: "Prueba cutánea de alergias",
-                doctor: "Dra. Ana Rivas",
+            examen(
+                "Prueba cutánea de alergias",
+                doctor: "Ana Rivas",
                 fecha: Formatting.sumarDias(-7, a: hoy),
                 estado: .completado,
-                resultado: "Positivo a ácaros del polvo y polen de gramíneas. Negativo a epitelio de gato.",
-                archivo: "resultado-prueba-cutanea.pdf"
+                resultado: "Positivo a ácaros del polvo y polen de gramíneas. Negativo a epitelio de gato."
             ),
-            ResultadoLaboratorio(
-                examen: "Hemograma completo",
-                doctor: "Dr. Carlos Molina",
+            examen(
+                "Hemograma completo",
+                doctor: "Carlos Molina",
                 fecha: Formatting.sumarDias(-1, a: hoy),
                 estado: .completado,
-                resultado: "Valores dentro de rangos de referencia.",
-                archivo: "hemograma.pdf"
+                resultado: "Valores dentro de rangos de referencia."
             ),
-            ResultadoLaboratorio(
-                examen: "Química sanguínea",
-                doctor: "Dr. Carlos Molina",
-                fecha: hoy,
-                estado: .enProceso,
-                resultado: nil,
-                archivo: nil
-            ),
-            ResultadoLaboratorio(
-                examen: "Examen general de orina",
-                doctor: "Dr. Carlos Molina",
-                fecha: hoy,
-                estado: .pendiente,
-                resultado: nil,
-                archivo: nil
-            ),
+            examen("Química sanguínea", doctor: "Carlos Molina", fecha: hoy, estado: .enProceso),
+            examen("Examen general de orina", doctor: "Carlos Molina", fecha: hoy, estado: .pendiente),
         ]
+    }
+
+    private static func examen(
+        _ nombre: String,
+        doctor: String,
+        fecha: Date,
+        estado: EstadoLaboratorio,
+        resultado: String? = nil
+    ) -> ExamenLaboratorioPaciente {
+        let completado = estado == .completado ? Formatting.fecha(fecha, hora: 11, minuto: 25) : nil
+        return ExamenLaboratorioPaciente(
+            id: UUID(),
+            ordenId: UUID(),
+            nombre: nombre,
+            tipoMuestra: nil,
+            doctor: doctor,
+            fechaSolicitud: Formatting.fecha(fecha, hora: 10, minuto: 40),
+            indicaciones: nil,
+            estado: estado,
+            fechaInicio: estado == .pendiente ? nil : Formatting.fecha(fecha, hora: 10, minuto: 50),
+            fechaCompletado: completado,
+            resultado: resultado.map {
+                ResultadoExamen(
+                    id: UUID(), valor: $0, unidad: nil, rangoReferencia: nil, observaciones: nil,
+                    tieneArchivo: false, fechaResultado: completado ?? fecha
+                )
+            }
+        )
     }
 
     static func consultas(hoy: Date) -> [ConsultaPaciente] {

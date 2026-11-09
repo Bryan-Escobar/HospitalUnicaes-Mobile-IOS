@@ -79,6 +79,24 @@ enum Formatting {
         "\(diaNumero(date)) \(mes(date))"
     }
 
+    /// "14 de octubre", para VoiceOver.
+    static func diaYMes(_ date: Date) -> String {
+        texto(date, formato: "d 'de' MMMM")
+    }
+
+    /// "16 oct, 11:25".
+    static func fechaCortaConHora(_ date: Date) -> String {
+        "\(fechaCorta(date)), \(hora(date))"
+    }
+
+    /// "Prueba cutánea de alergias" → "prueba-cutanea-de-alergias" (nombre del PDF).
+    static func slug(_ text: String) -> String {
+        text.folding(options: .diacriticInsensitive, locale: Locale(identifier: "es"))
+            .lowercased()
+            .split { !($0.isASCII && ($0.isLetter || $0.isNumber)) }
+            .joined(separator: "-")
+    }
+
     static func fechaYHora(_ date: Date) -> String {
         "\(diaCorto(date)) \(fechaCorta(date)) · \(hora(date))"
     }

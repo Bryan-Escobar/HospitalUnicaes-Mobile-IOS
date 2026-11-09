@@ -3,6 +3,7 @@ import SwiftUI
 /// Decide qué flujo mostrar según la sesión y el rol de `/api/auth/me`.
 struct RootView: View {
     @Environment(SessionViewModel.self) private var session
+    @Environment(\.pacienteDependencies) private var pacienteDependencies
 
     var body: some View {
         Group {
@@ -16,7 +17,7 @@ struct RootView: View {
                 case .doctor:
                     DoctorTabView(me: me)
                 default:
-                    PacienteTabView(me: me)
+                    PacienteTabView(me: me, dependencies: pacienteDependencies)
                 }
             case .accesoNoDisponible(let me):
                 AccesoNoDisponibleView(me: me)

@@ -107,8 +107,8 @@ struct PacienteInicioView: View {
             }
             ForEach(viewModel.ultimosResultados) { resultado in
                 ResumenRow(
-                    titulo: resultado.examen,
-                    detalle: "\(resultado.doctor) · \(Formatting.fechaCorta(resultado.fecha))",
+                    titulo: resultado.nombre,
+                    detalle: "\(resultado.doctor) · \(Formatting.fechaCorta(resultado.fechaSolicitud))",
                     status: resultado.estado.status
                 )
             }

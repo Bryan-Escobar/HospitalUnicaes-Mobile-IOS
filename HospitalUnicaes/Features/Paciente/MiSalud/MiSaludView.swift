@@ -1,8 +1,13 @@
 import SwiftUI
 
-/// iOS-P5 / P7 / P9 Mi salud.
+/// iOS-P5 / P7 / P9 Mi salud. El laboratorio se escucha en vivo mientras la pestaña
+/// está visible y la app activa; el canal sigue abierto al entrar a iOS-P8.
 struct MiSaludView: View {
     @Bindable var viewModel: MiSaludViewModel
+    let laboratorio: LaboratorioPacienteViewModel
+    /// La pestaña Mi salud está seleccionada.
+    var activo = true
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         NavigationStack {
@@ -16,16 +21,45 @@ struct MiSaludView: View {
                     .pickerStyle(.segmented)
                     switch viewModel.segmento {
                     case .historial: historial
-                    case .laboratorio: laboratorio
+                    case .laboratorio: LaboratorioPacienteLista(laboratorio: laboratorio)
                     case .habitacion: habitacion
                     }
                 }
                 .pantallaPrincipal()
             }
+            .refreshable {
+                if viewModel.segmento == .laboratorio { await laboratorio.recargar() }
+            }
             .background(DSColor.backgroundGrouped)
             .navigationTitle("Mi salud")
+            .toolbar {
+                if viewModel.segmento == .laboratorio {
+                    if #available(iOS 26, *) {
+                        // Sin la cápsula de vidrio de la barra: el chip ya trae su propio fondo.
+                        ToolbarItem(placement: .topBarTrailing) {
+                            DSLiveIndicator(laboratorio.conexion)
+                        }
+                        .sharedBackgroundVisibility(.hidden)
+                    } else {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            DSLiveIndicator(laboratorio.conexion)
+                        }
+                    }
+                }
+            }
             .navigationDestination(for: PacienteRoute.self) { PacienteDestination(route: $0) }
         }
+        .task(id: escuchando) {
+            if escuchando { await laboratorio.escuchar() }
+        }
+        .onChange(of: activo) { _, visible in
+            if !visible { laboratorio.descartarAviso() }
+        }
+        .environment(laboratorio)
+    }
+
+    private var escuchando: Bool {
+        activo && scenePhase == .active
     }
 
     @ViewBuilder
@@ -41,28 +75,6 @@ struct MiSaludView: View {
                     ResumenRow(
                         titulo: "\(Formatting.fechaCorta(consulta.fecha)) · \(consulta.diagnostico)",
                         detalle: "\(consulta.doctor) · \(consulta.especialidad)",
-                        muestraChevron: true
-                    )
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var laboratorio: some View {
-        if let aviso = viewModel.avisoLaboratorio {
-            DSBanner(aviso, kind: .info)
-        }
-        if viewModel.resultados.isEmpty {
-            ContentUnavailableView("Sin órdenes de laboratorio", systemImage: "cross.case")
-        } else {
-            ListaTarjeta(items: viewModel.resultados) { resultado in
-                NavigationLink(value: PacienteRoute.resultado(resultado)) {
-                    ResumenRow(
-                        titulo: resultado.examen,
-                        detalle: "\(resultado.doctor) · \(Formatting.fechaCorta(resultado.fecha))",
-                        status: resultado.estado.status,
                         muestraChevron: true
                     )
                 }
@@ -160,7 +172,7 @@ struct DetalleConsultaPacienteView: View {
                     }
                     ForEach(consulta.ordenes) { orden in
                         NavigationLink(value: PacienteRoute.resultado(orden)) {
-                            ResumenRow(titulo: orden.examen, status: orden.estado.status, muestraChevron: true)
+                            ResumenRow(titulo: orden.nombre, status: orden.estado.status, muestraChevron: true)
                         }
                         .buttonStyle(.plain)
                     }
@@ -174,46 +186,6 @@ struct DetalleConsultaPacienteView: View {
     }
 }
 
-/// iOS-P8 Resultado de laboratorio. El PDF todavía no se descarga (sin endpoint).
-struct ResultadoLaboratorioView: View {
-    let resultado: ResultadoLaboratorio
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: DSSpacing.medium) {
-                DSStatusBadge(resultado.estado.status, size: .large)
-                Text(resultado.examen).font(DSFont.largeTitle)
-                Text("Ordenada por \(resultado.doctor) · \(Formatting.fechaCorta(resultado.fecha))")
-                    .font(DSFont.bodySecondary)
-                    .foregroundStyle(DSColor.textSecondary)
-                if let texto = resultado.resultado {
-                    DSCard {
-                        Text("Resultado").font(DSFont.subtitle)
-                        Text(texto).font(DSFont.body)
-                    }
-                } else {
-                    DSBanner("El laboratorio aún no carga el resultado. Te avisaremos cuando esté listo.", kind: .info)
-                }
-                if let archivo = resultado.archivo {
-                    DSCard {
-                        Label(archivo, systemImage: "doc.richtext")
-                            .font(DSFont.bodySecondaryEmphasis)
-                            .foregroundStyle(DSColor.textPrimary)
-                        Text("PDF · disponible cuando se conecte el laboratorio")
-                            .font(DSFont.footnote)
-                            .foregroundStyle(DSColor.textSecondary)
-                    }
-                }
-            }
-            .foregroundStyle(DSColor.textPrimary)
-            .pantallaPrincipal()
-        }
-        .background(DSColor.backgroundGrouped)
-        .navigationTitle("Laboratorio")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
-
 /// Destinos de las pilas del paciente.
 struct PacienteDestination: View {
     let route: PacienteRoute
@@ -222,11 +194,19 @@ struct PacienteDestination: View {
         switch route {
         case .cita(let cita): DetalleCitaPacienteView(cita: cita)
         case .consulta(let consulta): DetalleConsultaPacienteView(consulta: consulta)
-        case .resultado(let resultado): ResultadoLaboratorioView(resultado: resultado)
+        case .resultado(let examen): ResultadoLaboratorioView(examen: examen)
         }
     }
 }
 
 #Preview {
-    MiSaludView(viewModel: MiSaludViewModel())
+    let dependencies = PacienteDependencies.preview
+    MiSaludView(
+        viewModel: MiSaludViewModel(),
+        laboratorio: LaboratorioPacienteViewModel(
+            service: dependencies.laboratorio,
+            realtime: dependencies.laboratorioRealtime
+        )
+    )
+    .environment(\.pacienteDependencies, dependencies)
 }
