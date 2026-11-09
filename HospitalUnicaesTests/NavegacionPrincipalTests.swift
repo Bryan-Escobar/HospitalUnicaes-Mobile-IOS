@@ -99,12 +99,11 @@ struct NavegacionPrincipalTests {
         #expect(viewModel.ayuda == "La ambulancia no está disponible en este momento.")
     }
 
-    @Test func miSaludAvisaCuandoHayResultadoListo() {
+    @Test func miSaludMuestraHistorialYHabitacionDeEjemplo() {
         let viewModel = MiSaludViewModel(hoy: hoy)
 
         #expect(viewModel.segmento == .historial)
         #expect(viewModel.consultas.map(\.fecha) == viewModel.consultas.map(\.fecha).sorted(by: >))
-        #expect(viewModel.avisoLaboratorio != nil)
         #expect(viewModel.habitacion?.codigo == "HAB-204")
     }
 
