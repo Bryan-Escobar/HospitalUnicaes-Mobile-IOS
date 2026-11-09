@@ -10,6 +10,10 @@
 	<string>$(SUPABASE_ANON_KEY)</string>
 	<key>USE_MOCK_ME</key>
 	<string>$(USE_MOCK_ME)</string>
+	<key>HOSPITAL_TELEFONO</key>
+	<string>$(HOSPITAL_TELEFONO)</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Usamos tu ubicación solo para enviarla a recepción cuando solicitas la ambulancia.</string>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>
