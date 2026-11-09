@@ -9,6 +9,8 @@ enum AppConfig {
     static let supabaseAnonKey = string(for: "SUPABASE_ANON_KEY")
     /// `USE_MOCK_ME = YES` simula `/api/auth/me` y `/api/auth/registro` (ver `MockMeService`).
     static let useMockMe = string(for: "USE_MOCK_ME")?.uppercased() == "YES"
+    /// Número de "Llamar al hospital" (iOS-P11); `nil` oculta el botón.
+    static let hospitalTelefono = string(for: "HOSPITAL_TELEFONO")
 
     static var isSupabaseConfigured: Bool {
         supabaseURL != nil && supabaseAnonKey != nil

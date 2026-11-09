@@ -71,5 +71,7 @@ enum UserFacingError {
         "TRANSICION_INVALIDA": "La cita ya no se puede atender (fue atendida o cancelada).",
         "REFERENCIA_INVALIDA": "Uno de los datos ya no existe (paciente, cita o examen). Actualiza e intenta de nuevo.",
         "VALIDACION": "Revisa los datos del formulario.",
+        "LIMITE_SOLICITUDES": "Ya tienes una solicitud de ambulancia en curso.",
+        "SOLICITUD_CERRADA": "Esta solicitud ya terminó.",
     ]
 }
