@@ -1,0 +1,13 @@
+// Ambiente de producción (configuración Release).
+#include "Shared.xcconfig"
+
+APP_DISPLAY_NAME = Hospital UNICAES
+API_BASE_URL =
+SUPABASE_URL =
+SUPABASE_ANON_KEY =
+
+// Producción siempre usa la API real.
+USE_MOCK_ME = NO
+
+// Valores reales locales (no versionado). Copia Secrets.example.xcconfig.
+#include? "Secrets.xcconfig"
