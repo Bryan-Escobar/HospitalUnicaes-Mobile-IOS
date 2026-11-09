@@ -89,6 +89,8 @@ final class SessionViewModel {
 
     private func discardSession() async {
         try? await authService.signOut()
+        // Los PDF de resultados descargados no sobreviven a la sesión.
+        URLSessionResultadoArchivoService().borrar(nil)
     }
 
     private func expireSession() async {
