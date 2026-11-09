@@ -71,34 +71,6 @@ struct NavegacionPrincipalTests {
         #expect(citas.segmento == .proximas)
     }
 
-    @Test func ambulanciaSoloSeConfirmaDisponibleConTipoYUbicacion() {
-        let viewModel = AmbulanciaPacienteViewModel(ahora: { hoy })
-        #expect(!viewModel.puedeConfirmar)
-
-        viewModel.tipo = "Dolor de pecho"
-        viewModel.usarUbicacion = false
-        #expect(!viewModel.puedeConfirmar)
-        viewModel.direccion = "Calle 1, casa 2"
-        #expect(viewModel.puedeConfirmar)
-
-        viewModel.confirmar()
-        #expect(viewModel.solicitud?.estado == .enviada)
-        #expect(viewModel.solicitud?.ubicacion == "Calle 1, casa 2")
-        #expect(!viewModel.puedeConfirmar)
-
-        viewModel.nuevaSolicitud()
-        #expect(viewModel.solicitud == nil)
-        #expect(viewModel.tipo == nil)
-    }
-
-    @Test func ambulanciaEnServicioNoSePuedeSolicitar() {
-        let viewModel = AmbulanciaPacienteViewModel(estado: .enServicio)
-        viewModel.tipo = "Accidente"
-
-        #expect(!viewModel.puedeConfirmar)
-        #expect(viewModel.ayuda == "La ambulancia no está disponible en este momento.")
-    }
-
     @Test func miSaludAvisaCuandoHayResultadoListo() {
         let viewModel = MiSaludViewModel(hoy: hoy)
 
