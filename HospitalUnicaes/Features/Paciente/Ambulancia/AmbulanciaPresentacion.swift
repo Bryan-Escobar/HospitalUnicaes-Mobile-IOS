@@ -78,9 +78,11 @@ extension SolicitudAmbulancia {
         let enviada = Formatting.unir([Formatting.hora(fechaSolicitud), tipoEmergencia?.etiqueta])
         let cancelada = estado == .cancelada
 
+        // El estado manda: si llega despachada sin fecha, el paso igual se marca.
+        let despachada = fechaDespacho != nil || [.despachada, .enCurso, .finalizada].contains(estado)
         var despacho = cancelada ? "No aplica" : "Aún no"
-        if let fechaDespacho {
-            var partes: [String?] = [Formatting.hora(fechaDespacho), "por recepción"]
+        if despachada {
+            var partes: [String?] = [fechaDespacho.map(Formatting.hora), "por recepción"]
             if estado == .enCurso, let fechaEnCurso {
                 partes.append("en curso desde \(Formatting.hora(fechaEnCurso))")
             }
@@ -98,7 +100,7 @@ extension SolicitudAmbulancia {
 
         return [
             PasoSeguimiento(titulo: "Enviada", detalle: enviada, hecho: true),
-            PasoSeguimiento(titulo: "Despachada (En Servicio)", detalle: despacho, hecho: fechaDespacho != nil),
+            PasoSeguimiento(titulo: "Despachada (En Servicio)", detalle: despacho, hecho: despachada),
             final,
         ]
     }

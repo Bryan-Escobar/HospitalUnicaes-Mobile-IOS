@@ -70,6 +70,10 @@ struct AmbulanciaModelsTests {
         #expect(despachada.pasos.map(\.detalle) == ["10:12 · Dolor de pecho", "10:14 · por recepción", "Aún no"])
         #expect(despachada.pasos.map(\.hecho) == [true, true, false])
         #expect(despachada.estado.status.title == "Despachada · En Servicio")
+
+        let sinFecha = AmbulanciaFixtures.solicitud(.despachada)
+        #expect(sinFecha.pasos[1].hecho)
+        #expect(sinFecha.pasos[1].detalle == "por recepción")
     }
 
     private let id = "3f1c2a9e-7b4d-4c1e-9f0a-2d6b8e5c1a7f"
