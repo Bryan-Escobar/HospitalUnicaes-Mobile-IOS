@@ -1,10 +1,16 @@
 import Foundation
 
-/// Estados de la única ambulancia del hospital (`context.md` §3.5).
-enum EstadoAmbulancia: String, Hashable {
+/// Estados de la única ambulancia del hospital (`context.md` §3.5). Un valor desconocido
+/// se lee como `enServicio`: es el valor seguro porque no deja pedir la ambulancia.
+enum EstadoAmbulancia: String, Codable, Hashable, Sendable {
     case disponible
     case enServicio = "en_servicio"
     case enMantenimiento = "en_mantenimiento"
+
+    init(from decoder: Decoder) throws {
+        let value = try decoder.singleValueContainer().decode(String.self)
+        self = EstadoAmbulancia(rawValue: value) ?? .enServicio
+    }
 }
 
 /// Aviso general del hospital (información pública).
