@@ -9,7 +9,7 @@ final class PacienteInicioViewModel {
     let fecha: String
     let proximaCita: CitaPaciente?
     let habitacion: HabitacionPaciente?
-    let ultimosResultados: [ResultadoLaboratorio]
+    let ultimosResultados: [ExamenLaboratorioPaciente]
     let ambulancia: EstadoAmbulancia
     let aviso: Aviso?
 
@@ -20,7 +20,7 @@ final class PacienteInicioViewModel {
             .filter { $0.fecha >= hoy && ($0.estado == .programada || $0.estado == .confirmada) }
             .min { $0.fecha < $1.fecha }
         habitacion = PacienteMuestra.habitacion(hoy: hoy)
-        ultimosResultados = Array(PacienteMuestra.resultados(hoy: hoy).sorted { $0.fecha > $1.fecha }.prefix(2))
+        ultimosResultados = Array(PacienteMuestra.resultados(hoy: hoy).sorted { $0.fechaSolicitud > $1.fechaSolicitud }.prefix(2))
         self.ambulancia = ambulancia
         aviso = Aviso(titulo: "Aviso", detalle: "el horario de visitas cambia a 2:00–6:00 p. m. desde el lunes.")
     }
