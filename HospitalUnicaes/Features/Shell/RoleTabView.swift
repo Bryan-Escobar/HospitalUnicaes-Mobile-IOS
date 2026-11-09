@@ -56,6 +56,7 @@ struct PacienteTabView: View {
     @State private var tab: PacienteTab = .inicio
     @State private var miSalud = MiSaludViewModel()
     @Environment(\.healthService) private var health
+    @Environment(\.pacienteDependencies) private var dependencies
 
     var body: some View {
         TabView(selection: $tab) {
@@ -71,7 +72,7 @@ struct PacienteTabView: View {
             MiSaludView(viewModel: miSalud)
                 .tabItem { TabLabel(title: "Mi salud", systemImage: "heart.text.square") }
                 .tag(PacienteTab.miSalud)
-            AmbulanciaPacienteView()
+            AmbulanciaPacienteView(dependencies: dependencies)
                 .tabItem { TabLabel(title: "Ambulancia", systemImage: "light.beacon.max") }
                 .tag(PacienteTab.ambulancia)
             PerfilView(viewModel: PerfilViewModel(me: me, health: health))
@@ -91,4 +92,5 @@ struct PacienteTabView: View {
 #Preview("Paciente") {
     PacienteTabView(me: .previewPaciente)
         .environment(SessionViewModel.preview())
+        .environment(\.pacienteDependencies, .preview)
 }

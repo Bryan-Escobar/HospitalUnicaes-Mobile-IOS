@@ -51,6 +51,15 @@ extension DSStatus {
     // Solicitud de cita o ambulancia
     static let solicitudEnviada = DSStatus(domain: "Solicitud", title: "Enviada", systemImage: "circle", tone: .warning)
     static let solicitudRechazada = DSStatus(domain: "Solicitud", title: "Rechazada", systemImage: "xmark", tone: .neutral)
+    static let solicitudDespachada = DSStatus(
+        domain: "Solicitud", title: "Despachada · En Servicio", systemImage: "arrow.right", tone: .danger
+    )
+    static let solicitudEnCurso = DSStatus(
+        domain: "Solicitud", title: "En curso · En Servicio", systemImage: "arrow.right", tone: .danger
+    )
+    static let solicitudFinalizada = DSStatus(
+        domain: "Solicitud", title: "Finalizada", systemImage: "checkmark", tone: .success
+    )
 
     // Bitácora, inventario, avisos y turnos
     static let bitacoraFinalizado = DSStatus(domain: "Servicio", title: "Finalizado", systemImage: "checkmark", tone: .success)
@@ -68,7 +77,7 @@ extension DSStatus {
         ambulanciaDisponible, ambulanciaEnServicio, ambulanciaEnMantenimiento,
         camaLibre, camaOcupada, camaElegida,
         citaProgramada, citaConfirmada, citaAtendida, citaCancelada, citaNoAsistio,
-        solicitudEnviada, solicitudRechazada,
+        solicitudEnviada, solicitudRechazada, solicitudDespachada, solicitudEnCurso, solicitudFinalizada,
         bitacoraFinalizado, stockBajo,
         avisoVigente, avisoProgramado, avisoVencido,
         turnoEnCurso,

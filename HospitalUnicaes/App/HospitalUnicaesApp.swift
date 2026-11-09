@@ -4,6 +4,7 @@ import SwiftUI
 struct HospitalUnicaesApp: App {
     @State private var session: SessionViewModel
     @State private var doctorDependencies: DoctorDependencies
+    @State private var pacienteDependencies: PacienteDependencies
 
     init() {
         #if DEBUG
@@ -13,6 +14,7 @@ struct HospitalUnicaesApp: App {
             let state: SessionViewModel.State = me.rol.usesIOSApp ? .signedIn(me) : .accesoNoDisponible(me)
             _session = State(initialValue: .preview(state))
             _doctorDependencies = State(initialValue: .preview)
+            _pacienteDependencies = State(initialValue: .preview)
             return
         }
         #endif
@@ -24,6 +26,7 @@ struct HospitalUnicaesApp: App {
             : APIMeService(client: apiClient)
         _session = State(initialValue: SessionViewModel(authService: authService, meService: meService))
         _doctorDependencies = State(initialValue: .live(supabase: supabase, api: apiClient))
+        _pacienteDependencies = State(initialValue: .live(supabase: supabase, api: apiClient))
     }
 
     var body: some Scene {
@@ -31,6 +34,7 @@ struct HospitalUnicaesApp: App {
             RootView()
                 .environment(session)
                 .environment(\.doctorDependencies, doctorDependencies)
+                .environment(\.pacienteDependencies, pacienteDependencies)
         }
     }
 }
