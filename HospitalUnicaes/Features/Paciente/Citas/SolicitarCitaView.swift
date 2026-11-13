@@ -1,10 +1,15 @@
 import SwiftUI
 
-/// iOS-P4 Solicitar cita (sheet).
+/// iOS-P4 Solicitar atención (sheet, HUNI-56). Al enviarse aparece en la bandeja de recepción.
 struct SolicitarCitaView: View {
-    @State private var viewModel = SolicitarCitaViewModel()
+    @State private var viewModel: SolicitarCitaViewModel
     @Environment(\.dismiss) private var dismiss
-    let onEnviada: (SolicitudCita) -> Void
+    let onEnviada: (SolicitudAtencion) -> Void
+
+    init(service: any CitasPacienteService, onEnviada: @escaping (SolicitudAtencion) -> Void) {
+        _viewModel = State(initialValue: SolicitarCitaViewModel(service: service))
+        self.onEnviada = onEnviada
+    }
 
     var body: some View {
         NavigationStack {
@@ -18,30 +23,41 @@ struct SolicitarCitaView: View {
                         axis: .vertical
                     )
                     SeccionTitulo("Especialidad o tipo de doctor")
-                    Chips(opciones: SolicitarCitaViewModel.especialidades, seleccion: $viewModel.especialidad)
+                    Chips(opciones: viewModel.opcionesEspecialidad, seleccion: $viewModel.especialidad)
                     SeccionTitulo("Preferencia de fecha")
                     DatePicker(
                         "Día preferido",
                         selection: $viewModel.diaPreferido,
-                        in: Date()...,
+                        in: Formatting.startOfDay(Date())...,
                         displayedComponents: .date
                     )
                     .font(DSFont.bodySecondary)
                     .padding(.horizontal, DSSpacing.regular)
                     .frame(minHeight: 52)
                     .dsCardBackground()
-                    Chips(opciones: SolicitarCitaViewModel.franjas, seleccion: $viewModel.franja)
-                    DSButton("Enviar solicitud", systemImage: "paperplane") {
-                        guard let solicitud = viewModel.enviar() else { return }
-                        onEnviada(solicitud)
-                        dismiss()
+                    Chips(opciones: FranjaHoraria.allCases.map(\.titulo), seleccion: franja)
+                    if let message = viewModel.errorMessage {
+                        DSBanner(message)
                     }
+                    DSButton(
+                        "Enviar solicitud",
+                        systemImage: "paperplane",
+                        isLoading: viewModel.isSending,
+                        loadingTitle: "Enviando…"
+                    ) {
+                        Task {
+                            guard let solicitud = await viewModel.enviar() else { return }
+                            onEnviada(solicitud)
+                            dismiss()
+                        }
+                    }
+                    .disabled(viewModel.isSending)
                     .padding(.top, DSSpacing.small)
                 }
                 .padding(DSSpacing.regular)
             }
             .background(DSColor.backgroundGrouped)
-            .navigationTitle("Solicitar cita")
+            .navigationTitle("Solicitar atención")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -49,6 +65,15 @@ struct SolicitarCitaView: View {
                 }
             }
         }
+        .task { await viewModel.cargarEspecialidades() }
+    }
+
+    /// Los chips trabajan con el título; el ViewModel guarda la franja.
+    private var franja: Binding<String> {
+        Binding(
+            get: { viewModel.franja.titulo },
+            set: { titulo in viewModel.franja = FranjaHoraria.allCases.first { $0.titulo == titulo } ?? .cualquiera }
+        )
     }
 }
 
@@ -123,5 +148,5 @@ private struct FlujoChips: Layout {
 }
 
 #Preview {
-    SolicitarCitaView { _ in }
+    SolicitarCitaView(service: PreviewCitasPacienteService()) { _ in }
 }

@@ -10,6 +10,7 @@ extension PacienteDependencies {
         solicitud: SolicitudAmbulancia? = nil
     ) -> PacienteDependencies {
         PacienteDependencies(
+            citas: PreviewCitasPacienteService(),
             laboratorio: PreviewLaboratorioPacienteService(),
             laboratorioRealtime: PreviewLaboratorioRealtime(),
             resultadoArchivos: PreviewResultadoArchivoService(),
@@ -80,6 +81,48 @@ enum PacientePreviewData {
             fechaEnCurso: estado == .enCurso ? Formatting.fecha(Date(), hora: 10, minuto: 20) : nil,
             fechaCierre: estado == .finalizada || estado == .cancelada ? Formatting.fecha(Date(), hora: 11, minuto: 2) : nil,
             notasCierre: nil, motivoCancelacion: estado == .cancelada ? "Solicitud duplicada" : nil
+        )
+    }
+}
+
+/// Citas de ejemplo del Figma y una solicitud en revisión; enviar devuelve la solicitud sin red.
+struct PreviewCitasPacienteService: CitasPacienteService {
+    func citas() async throws -> [Cita] {
+        let hoy = Date()
+        return [
+            cita(Formatting.fecha(Formatting.sumarDias(1, a: hoy), hora: 10, minuto: 30), .programada, "Control de alergia"),
+            cita(Formatting.fecha(Formatting.sumarDias(13, a: hoy), hora: 9), .confirmada, "Control general"),
+            cita(Formatting.fecha(Formatting.sumarDias(-7, a: hoy), hora: 10), .atendida, "Rinitis alérgica"),
+        ]
+    }
+
+    func solicitudes() async throws -> [SolicitudAtencion] {
+        [solicitud("Revisión general", especialidad: "Medicina general")]
+    }
+
+    func especialidades() async throws -> [Especialidad] {
+        ["Alergología", "Medicina general", "Pediatría"].map { Especialidad(id: UUID(), nombre: $0) }
+    }
+
+    func enviar(_ nueva: NuevaSolicitudAtencion) async throws -> SolicitudAtencion {
+        solicitud(nueva.motivo, especialidad: nil, fecha: nueva.fechaPreferida, franja: nueva.franja)
+    }
+
+    private func cita(_ fecha: Date, _ estado: EstadoCita, _ motivo: String) -> Cita {
+        Cita(
+            id: UUID(), pacienteId: UUID(), doctorId: PacientePreviewData.doctorRivas.id, especialidadId: nil,
+            pacienteNombres: "Carlos", pacienteApellidos: "Martínez", doctorNombres: "Ana", doctorApellidos: "Rivas",
+            especialidad: "Alergología", fechaHora: fecha, fechaHoraFin: fecha.addingTimeInterval(1_800),
+            createdAt: Date(), duracionMinutos: 30, motivo: motivo, estado: estado
+        )
+    }
+
+    private func solicitud(
+        _ motivo: String, especialidad: String?, fecha: String? = nil, franja: FranjaHoraria = .manana
+    ) -> SolicitudAtencion {
+        SolicitudAtencion(
+            id: UUID(), motivo: motivo, especialidad: especialidad, fechaPreferida: fecha, franja: franja,
+            estado: .pendiente, respuesta: nil, respondidaEn: nil, createdAt: Date()
         )
     }
 }

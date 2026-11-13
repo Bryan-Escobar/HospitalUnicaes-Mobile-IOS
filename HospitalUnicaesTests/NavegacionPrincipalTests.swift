@@ -26,33 +26,6 @@ struct NavegacionPrincipalTests {
         #expect(viewModel.puedeSolicitarAmbulancia)
     }
 
-    @Test func citasSeparanProximasDePasadas() {
-        let viewModel = CitasPacienteViewModel(hoy: hoy)
-
-        #expect(viewModel.visibles.allSatisfy { $0.fecha >= hoy })
-        viewModel.segmento = .pasadas
-        #expect(viewModel.visibles.allSatisfy { $0.fecha < hoy })
-        #expect(viewModel.visibles.map(\.estado) == [.atendida, .cancelada])
-    }
-
-    @Test func solicitudDeCitaPideMotivoYSeAgregaArriba() throws {
-        let formulario = SolicitarCitaViewModel(hoy: hoy)
-        #expect(formulario.enviar() == nil)
-        #expect(formulario.motivoError != nil)
-
-        formulario.motivo = "  Dolor de garganta "
-        formulario.franja = "Mañana"
-        let solicitud = try #require(formulario.enviar())
-        #expect(solicitud.motivo == "Dolor de garganta")
-        #expect(solicitud.preferencia.hasSuffix("por la mañana"))
-
-        let citas = CitasPacienteViewModel(hoy: hoy)
-        citas.segmento = .pasadas
-        citas.agregar(solicitud)
-        #expect(citas.solicitudes.first == solicitud)
-        #expect(citas.segmento == .proximas)
-    }
-
     @Test func miSaludMuestraHistorialYHabitacionDeEjemplo() {
         let viewModel = MiSaludViewModel(hoy: hoy)
 

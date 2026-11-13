@@ -44,6 +44,12 @@ enum Formatting {
         return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: monday) }
     }
 
+    /// `2026-11-13` en El Salvador, el formato de las columnas `date` de la base.
+    static func diaISO(_ date: Date) -> String {
+        let partes = calendar.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", partes.year ?? 0, partes.month ?? 0, partes.day ?? 0)
+    }
+
     static func sumarDias(_ dias: Int, a date: Date) -> Date {
         calendar.date(byAdding: .day, value: dias, to: startOfDay(date)) ?? date
     }
