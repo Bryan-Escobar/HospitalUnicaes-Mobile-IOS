@@ -4,6 +4,7 @@ import SwiftUI
 /// Servicios del flujo del paciente. Se crean una vez en `HospitalUnicaesApp` con el mismo
 /// `SupabaseClient` y `APIClient` de la sesión.
 struct PacienteDependencies {
+    var citas: any CitasPacienteService
     var laboratorio: any LaboratorioPacienteService
     var laboratorioRealtime: any LaboratorioRealtimeService
     var resultadoArchivos: any ResultadoArchivoService
@@ -13,6 +14,7 @@ struct PacienteDependencies {
 
     static func live(supabase: SupabaseClient?, api: APIClient) -> PacienteDependencies {
         PacienteDependencies(
+            citas: SupabaseCitasPacienteService(client: supabase),
             laboratorio: APILaboratorioPacienteService(client: api),
             laboratorioRealtime: SupabaseLaboratorioRealtimeService(client: supabase),
             resultadoArchivos: URLSessionResultadoArchivoService(),

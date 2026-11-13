@@ -4,7 +4,7 @@ import Foundation
 // `PacienteMuestra` arma los datos del Figma con fechas relativas a hoy.
 
 struct CitaPaciente: Hashable, Identifiable {
-    let id = UUID()
+    var id = UUID()
     let fecha: Date
     let doctor: String
     let especialidad: String
