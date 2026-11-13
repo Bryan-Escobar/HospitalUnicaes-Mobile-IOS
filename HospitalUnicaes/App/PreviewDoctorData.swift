@@ -6,6 +6,7 @@ extension DoctorDependencies {
     static var preview: DoctorDependencies {
         DoctorDependencies(
             citas: PreviewCitasService(),
+            turnos: PreviewTurnosService(),
             pacientes: PreviewPacientesService(),
             hospitalizaciones: PreviewHospitalizacionesService(),
             consultas: PreviewConsultasService(),
@@ -98,6 +99,34 @@ enum DoctorPreviewData {
             doctorNombres: "Ana", doctorApellidos: "Rivas", especialidad: "Alergista",
             fechaHora: inicio, fechaHoraFin: fin, createdAt: Date(), duracionMinutos: 30,
             motivo: motivo, estado: estado
+        )
+    }
+}
+
+/// Turnos de ejemplo: Consulta externa de lunes a jueves y una guardia nocturna el viernes.
+struct PreviewTurnosService: TurnosService {
+    func misTurnos(desde: Date, hasta: Date) async throws -> [TurnoPersonal] {
+        var turnos: [TurnoPersonal] = []
+        var dia = Formatting.startOfDay(desde)
+        while dia <= hasta {
+            let semana = (Formatting.calendar.component(.weekday, from: dia) + 5) % 7
+            if semana < 4 {
+                turnos.append(turno(dia, 8, 14, "Consulta externa", "manana"))
+            } else if semana == 4 {
+                turnos.append(turno(dia, 19, 7, "Emergencia", "noche"))
+            }
+            dia = Formatting.sumarDias(1, a: dia)
+        }
+        return turnos
+    }
+
+    private func turno(_ dia: Date, _ desde: Int, _ hasta: Int, _ area: String, _ tipo: String) -> TurnoPersonal {
+        let fin = Formatting.fecha(hasta > desde ? dia : Formatting.sumarDias(1, a: dia), hora: hasta)
+        return TurnoPersonal(
+            id: UUID(), personalId: DoctorPreviewData.doctor, area: area, tipoTurno: tipo,
+            fecha: SupabaseTurnosService.dia(dia),
+            horaInicio: String(format: "%02d:00:00", desde), horaFin: String(format: "%02d:00:00", hasta),
+            inicio: Formatting.fecha(dia, hora: desde), fin: fin, especialidad: "Alergista", notas: nil
         )
     }
 }

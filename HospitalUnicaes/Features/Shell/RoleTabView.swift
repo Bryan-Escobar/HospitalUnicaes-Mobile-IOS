@@ -39,7 +39,7 @@ struct DoctorTabView: View {
             PacientesView(dependencies: dependencies)
                 .tabItem { TabLabel(title: "Pacientes", systemImage: "person.2") }
                 .tag(DoctorTab.pacientes)
-            TurnosView()
+            TurnosView(service: dependencies.turnos)
                 .tabItem { TabLabel(title: "Turnos", systemImage: "clock") }
                 .tag(DoctorTab.turnos)
             PerfilView(viewModel: PerfilViewModel(me: me, health: health))
