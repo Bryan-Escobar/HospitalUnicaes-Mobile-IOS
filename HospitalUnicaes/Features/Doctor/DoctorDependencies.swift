@@ -5,6 +5,7 @@ import SwiftUI
 /// en iOS-D3; HUNI-59 lo conecta con el formulario de nueva consulta (iOS-D7).
 struct DoctorDependencies {
     var citas: any CitasService
+    var turnos: any TurnosService
     var pacientes: any PacientesService
     var hospitalizaciones: any HospitalizacionesService
     var consultas: any ConsultasService
@@ -14,6 +15,7 @@ struct DoctorDependencies {
     static func live(supabase: SupabaseClient?, api: APIClient) -> DoctorDependencies {
         DoctorDependencies(
             citas: SupabaseCitasService(client: supabase),
+            turnos: SupabaseTurnosService(client: supabase),
             pacientes: APIPacientesService(client: api),
             hospitalizaciones: APIHospitalizacionesService(client: api),
             consultas: APIConsultasService(client: api),

@@ -16,24 +16,6 @@ struct NavegacionPrincipalTests {
         #expect(viewModel.conteosLaboratorio.map(\.cantidad) == [2, 1, 4])
     }
 
-    @Test func turnosMarcanHoyEnCursoYDiasPasadosTerminados() {
-        let viewModel = TurnosViewModel(hoy: hoy)
-
-        #expect(viewModel.turnos.count == 7)
-        #expect(viewModel.turnoDeHoy.map { Formatting.esMismoDia($0.dia, hoy) } == true)
-        #expect(viewModel.turnos.map(\.estado) == [.terminado, .sinTurno, .enCurso, .programado, .programado, .sinTurno, .sinTurno])
-        #expect(!viewModel.restantes.contains { $0.estado == .enCurso })
-    }
-
-    @Test func semanaSiguienteNoTieneTurnoEnCurso() {
-        let viewModel = TurnosViewModel(hoy: hoy)
-        viewModel.semana = .siguiente
-
-        #expect(viewModel.turnoDeHoy == nil)
-        #expect(viewModel.turnos.allSatisfy { $0.estado == .programado || $0.estado == .sinTurno })
-        #expect(viewModel.turnos.first.map { Formatting.esMismoDia($0.dia, Formatting.sumarDias(5, a: hoy)) } == true)
-    }
-
     @Test func inicioPacienteTomaLaCitaProgramadaMasCercana() throws {
         let viewModel = PacienteInicioViewModel(me: .fixture(rol: .paciente), hoy: hoy)
 

@@ -121,3 +121,13 @@ enum DoctorFixtures {
         )
     }
 }
+
+final class FakeTurnosService: TurnosService, @unchecked Sendable {
+    var result: Result<[TurnoPersonal], Error> = .success([])
+    private(set) var rangos: [(desde: Date, hasta: Date)] = []
+
+    func misTurnos(desde: Date, hasta: Date) async throws -> [TurnoPersonal] {
+        rangos.append((desde, hasta))
+        return try result.get()
+    }
+}

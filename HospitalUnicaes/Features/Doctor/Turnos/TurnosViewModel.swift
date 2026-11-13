@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-/// Un día de la semana en "Mis turnos". `horario == nil` es un día sin turno.
+/// Una fila de "Mis turnos": un turno del doctor o un día sin turno (`horario == nil`).
 struct TurnoDia: Hashable, Identifiable {
     enum Estado: Hashable {
         case terminado
@@ -10,13 +10,12 @@ struct TurnoDia: Hashable, Identifiable {
         case sinTurno
     }
 
+    let id: String
     let dia: Date
     let horario: String?
     let area: String?
     let especialidad: String?
     let estado: Estado
-
-    var id: Date { dia }
 }
 
 enum TurnosSemana: String, CaseIterable, Identifiable {
@@ -33,58 +32,104 @@ enum TurnosSemana: String, CaseIterable, Identifiable {
     }
 }
 
-/// iOS-D11 Mis turnos. Genera la semana actual y la siguiente con datos de ejemplo
-/// hasta conectar el catálogo de turnos del personal (`context.md` §3.2).
+/// iOS-D11 Mis turnos (HUNI-54). Pide a `v_turnos` los turnos del doctor de esta semana y la siguiente
+/// (lunes a domingo, El Salvador). El turno en curso se calcula con la hora real, así que el de noche que
+/// empezó ayer sigue "En curso" de madrugada.
 @MainActor
 @Observable
 final class TurnosViewModel {
-    /// Plantilla semanal (lunes = 0): horario, área y especialidad.
-    typealias Plantilla = [Int: (horario: String, area: String, especialidad: String)]
-
-    static let plantillaMuestra: Plantilla = [
-        0: ("08:00–14:00", "Consulta externa", "Alergista"),
-        2: ("08:00–14:00", "Consulta externa", "Alergista"),
-        3: ("08:00–14:00", "Consulta externa", "Alergista"),
-        4: ("14:00–20:00", "Emergencias (apoyo)", "Emergencia"),
-    ]
+    private let service: any TurnosService
+    private let hoy: () -> Date
+    private var carga = UUID()
 
     var semana: TurnosSemana = .actual
-    private let hoy: Date
-    private let plantilla: Plantilla
+    private(set) var turnosCargados: [TurnoPersonal] = []
+    private(set) var cargado = false
+    private(set) var isLoading = false
+    private(set) var errorMessage: String?
 
-    init(plantilla: Plantilla? = nil, hoy: Date = Date()) {
-        self.plantilla = plantilla ?? Self.plantillaMuestra
+    init(service: any TurnosService, hoy: @escaping () -> Date = Date.init) {
+        self.service = service
         self.hoy = hoy
     }
 
+    /// Lunes a domingo de la semana elegida.
+    var dias: [Date] {
+        let referencia = semana == .actual ? hoy() : Formatting.sumarDias(7, a: hoy())
+        return Formatting.semana(conteniendo: referencia)
+    }
+
+    /// La semana elegida, día por día: sus turnos en orden o una fila "Sin turno".
     var turnos: [TurnoDia] {
-        let referencia = semana == .actual ? hoy : Formatting.sumarDias(7, a: hoy)
-        return Formatting.semana(conteniendo: referencia).enumerated().map { indice, dia in
-            guard let turno = plantilla[indice] else {
-                return TurnoDia(dia: dia, horario: nil, area: nil, especialidad: nil, estado: .sinTurno)
+        let ahora = hoy()
+        return dias.flatMap { dia -> [TurnoDia] in
+            let delDia = turnosCargados
+                .filter { $0.dia.map { Formatting.esMismoDia($0, dia) } ?? false }
+                .sorted { $0.inicio < $1.inicio }
+            guard !delDia.isEmpty else {
+                return [TurnoDia(
+                    id: "sin-\(dia.timeIntervalSince1970)", dia: dia, horario: nil, area: nil,
+                    especialidad: nil, estado: .sinTurno
+                )]
             }
-            return TurnoDia(
-                dia: dia,
-                horario: turno.horario,
-                area: turno.area,
-                especialidad: turno.especialidad,
-                estado: estado(de: dia)
-            )
+            return delDia.map { Self.fila($0, dia: dia, ahora: ahora) }
         }
     }
 
-    /// El turno de hoy, destacado arriba de la lista (solo en la semana actual).
+    /// El turno en curso, destacado arriba (solo en la semana actual). Puede ser el de noche del domingo
+    /// anterior, que no sale entre los días de la semana.
     var turnoDeHoy: TurnoDia? {
         guard semana == .actual else { return nil }
-        return turnos.first { $0.estado == .enCurso }
+        let ahora = hoy()
+        guard let turno = turnosCargados.first(where: { $0.inicio <= ahora && ahora < $0.fin }) else { return nil }
+        return Self.fila(turno, dia: turno.dia ?? ahora, ahora: ahora)
     }
 
     var restantes: [TurnoDia] {
-        turnos.filter { $0 != turnoDeHoy }
+        let enCurso = turnoDeHoy?.id
+        return turnos.filter { $0.id != enCurso }
     }
 
-    private func estado(de dia: Date) -> TurnoDia.Estado {
-        if Formatting.esMismoDia(dia, hoy) { return .enCurso }
-        return dia < Formatting.startOfDay(hoy) ? .terminado : .programado
+    /// Sin ningún turno asignado en la semana elegida.
+    var estaVacio: Bool {
+        cargado && errorMessage == nil && turnoDeHoy == nil && turnos.allSatisfy { $0.estado == .sinTurno }
+    }
+
+    func cargar() async {
+        let token = UUID()
+        carga = token
+        if !cargado { isLoading = true }
+        errorMessage = nil
+        let lunes = Formatting.semana(conteniendo: hoy()).first ?? Formatting.startOfDay(hoy())
+        // Desde el domingo anterior: su turno de noche puede seguir en curso el lunes de madrugada.
+        let desde = Formatting.sumarDias(-1, a: lunes)
+        let hasta = Formatting.sumarDias(13, a: lunes)
+        do {
+            let resultado = try await service.misTurnos(desde: desde, hasta: hasta)
+            guard carga == token else { return }
+            turnosCargados = resultado
+            cargado = true
+            isLoading = false
+        } catch {
+            guard carga == token else { return }
+            errorMessage = "No se pudieron cargar tus turnos."
+            isLoading = false
+        }
+    }
+
+    private static func fila(_ turno: TurnoPersonal, dia: Date, ahora: Date) -> TurnoDia {
+        TurnoDia(
+            id: turno.id.uuidString,
+            dia: dia,
+            horario: turno.horario,
+            area: turno.esNocturno ? "\(turno.area) · nocturno" : turno.area,
+            especialidad: turno.especialidad,
+            estado: estado(de: turno, ahora: ahora)
+        )
+    }
+
+    private static func estado(de turno: TurnoPersonal, ahora: Date) -> TurnoDia.Estado {
+        if turno.inicio <= ahora && ahora < turno.fin { return .enCurso }
+        return turno.fin <= ahora ? .terminado : .programado
     }
 }
