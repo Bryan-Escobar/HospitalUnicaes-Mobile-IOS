@@ -1,11 +1,14 @@
 import SwiftUI
 
-/// iOS-P2 Mis citas.
+/// iOS-P2 Mis citas (HUNI-56): próximas y pasadas desde `v_citas`, y las solicitudes de atención arriba.
 struct CitasPacienteView: View {
     @State private var viewModel: CitasPacienteViewModel
+    @Environment(\.scenePhase) private var scenePhase
+    private let service: any CitasPacienteService
 
-    init(hoy: Date = Date()) {
-        _viewModel = State(initialValue: CitasPacienteViewModel(hoy: hoy))
+    init(service: any CitasPacienteService, hoy: @escaping () -> Date = Date.init) {
+        self.service = service
+        _viewModel = State(initialValue: CitasPacienteViewModel(service: service, hoy: hoy))
     }
 
     var body: some View {
@@ -18,15 +21,11 @@ struct CitasPacienteView: View {
                         }
                     }
                     .pickerStyle(.segmented)
-                    if viewModel.segmento == .proximas {
-                        ForEach(viewModel.solicitudes) { solicitud in
-                            SolicitudCard(solicitud: solicitud)
-                        }
-                    }
-                    lista
+                    contenido
                 }
                 .pantallaPrincipal()
             }
+            .refreshable { await viewModel.cargar() }
             .background(DSColor.backgroundGrouped)
             .navigationTitle("Citas")
             .toolbar {
@@ -37,8 +36,35 @@ struct CitasPacienteView: View {
             }
             .navigationDestination(for: PacienteRoute.self) { PacienteDestination(route: $0) }
             .sheet(isPresented: $viewModel.isSolicitando) {
-                SolicitarCitaView(onEnviada: viewModel.agregar)
+                SolicitarCitaView(service: service) { solicitud in
+                    viewModel.agregar(solicitud)
+                    Task { await viewModel.cargar() }
+                }
             }
+        }
+        .task { await viewModel.cargar() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await viewModel.cargar() } }
+        }
+    }
+
+    @ViewBuilder
+    private var contenido: some View {
+        if viewModel.isLoading {
+            ProgressView("Cargando tus citas…")
+                .frame(maxWidth: .infinity, minHeight: 200)
+        } else if let message = viewModel.errorMessage {
+            VStack(spacing: DSSpacing.medium) {
+                DSBanner(message)
+                DSButton("Reintentar", systemImage: "arrow.clockwise") { Task { await viewModel.cargar() } }
+            }
+        } else {
+            if viewModel.segmento == .proximas {
+                ForEach(viewModel.solicitudes) { solicitud in
+                    SolicitudCard(solicitud: solicitud)
+                }
+            }
+            lista
         }
     }
 
@@ -48,7 +74,7 @@ struct CitasPacienteView: View {
             ContentUnavailableView(
                 viewModel.segmento == .proximas ? "Sin citas próximas" : "Sin citas pasadas",
                 systemImage: "calendar",
-                description: Text("Solicita una cita y recepción te asignará fecha y doctor.")
+                description: Text("Solicita atención y recepción te asignará fecha y doctor.")
             )
         } else {
             ListaTarjeta(items: viewModel.visibles) { cita in
@@ -66,28 +92,39 @@ struct CitasPacienteView: View {
     }
 }
 
+/// Solicitud de atención: "en revisión" mientras está pendiente; rechazada con la respuesta de recepción.
 private struct SolicitudCard: View {
-    let solicitud: SolicitudCita
+    let solicitud: SolicitudAtencion
+
+    private var pendiente: Bool { solicitud.estado == .pendiente }
+    private var tono: DSTone { pendiente ? .warning : .neutral }
 
     var body: some View {
         VStack(alignment: .leading, spacing: DSSpacing.tiny) {
             HStack {
-                Text("Solicitud en revisión")
+                Text(pendiente ? "Solicitud en revisión" : "Solicitud no aceptada")
                     .font(DSFont.bodySecondaryEmphasis)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                DSStatusBadge(.solicitudEnviada)
+                DSStatusBadge(pendiente ? .solicitudEnviada : .solicitudRechazada)
             }
-            Text("\(solicitud.especialidad) · preferencia: \(solicitud.preferencia)")
+            Text(solicitud.motivo)
+                .font(DSFont.bodySecondary)
+            Text(Formatting.unir([solicitud.especialidad, "preferencia: \(solicitud.preferencia)"]))
                 .font(DSFont.footnote)
                 .foregroundStyle(DSColor.textSecondary)
+            if let respuesta = solicitud.respuesta?.nilIfBlank {
+                Text("Recepción: \(respuesta)")
+                    .font(DSFont.footnote)
+                    .foregroundStyle(DSColor.textSecondary)
+            }
         }
         .foregroundStyle(DSColor.textPrimary)
         .padding(.vertical, 14)
         .padding(.horizontal, DSSpacing.regular)
-        .background(DSTone.warning.background, in: RoundedRectangle(cornerRadius: DSRadius.card, style: .continuous))
+        .background(tono.background, in: RoundedRectangle(cornerRadius: DSRadius.card, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: DSRadius.card, style: .continuous)
-                .strokeBorder(DSTone.warning.border, style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
+                .strokeBorder(tono.border, style: StrokeStyle(lineWidth: 1.5, dash: pendiente ? [5, 4] : []))
         }
         .accessibilityElement(children: .combine)
     }
@@ -154,7 +191,7 @@ struct DetalleCitaPacienteView: View {
 }
 
 #Preview("Citas") {
-    CitasPacienteView()
+    CitasPacienteView(service: PreviewCitasPacienteService())
 }
 
 #Preview("Detalle") {

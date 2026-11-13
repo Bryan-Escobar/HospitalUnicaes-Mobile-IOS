@@ -76,7 +76,7 @@ struct PacienteTabView: View {
             }
             .tabItem { TabLabel(title: "Inicio", systemImage: "house") }
             .tag(PacienteTab.inicio)
-            CitasPacienteView()
+            CitasPacienteView(service: dependencies.citas)
                 .tabItem { TabLabel(title: "Citas", systemImage: "calendar") }
                 .tag(PacienteTab.citas)
             MiSaludView(viewModel: miSalud, laboratorio: laboratorio, activo: tab == .miSalud)
