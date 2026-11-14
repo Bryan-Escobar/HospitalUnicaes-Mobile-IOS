@@ -70,7 +70,7 @@ struct PacienteTabView: View {
 
     var body: some View {
         TabView(selection: $tab) {
-            PacienteInicioView(me: me) { destino, segmento in
+            PacienteInicioView(me: me, dependencies: dependencies) { destino, segmento in
                 if let segmento { miSalud.segmento = segmento }
                 tab = destino
             }

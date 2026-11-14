@@ -47,6 +47,31 @@ struct HabitacionPaciente: Hashable {
     let trasladoDesde: String?
 }
 
+extension HabitacionPaciente {
+    /// Hospitalización activa de la API en el formato de las pantallas del paciente.
+    init(_ hospitalizacion: Hospitalizacion) {
+        let habitacion = hospitalizacion.cama.habitacion
+        self.init(
+            codigo: habitacion.codigo,
+            cama: "Cama \(hospitalizacion.cama.letra)",
+            tipo: habitacion.tipo,
+            planta: "\(habitacion.planta).ª planta",
+            ingreso: hospitalizacion.fechaIngreso,
+            medicoTratante: hospitalizacion.doctorTratante.nombreCompleto,
+            trasladoDesde: nil
+        )
+    }
+}
+
+extension CitaPaciente {
+    /// La cita programada o confirmada más cercana que todavía no pasa.
+    static func proxima(entre citas: [CitaPaciente], ahora: Date) -> CitaPaciente? {
+        citas
+            .filter { ($0.estado == .programada || $0.estado == .confirmada) && $0.fecha >= ahora }
+            .min { $0.fecha < $1.fecha }
+    }
+}
+
 enum PacienteRoute: Hashable {
     case cita(CitaPaciente)
     case consulta(ConsultaPaciente)

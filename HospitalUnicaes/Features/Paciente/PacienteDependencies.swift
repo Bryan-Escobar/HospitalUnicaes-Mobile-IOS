@@ -10,6 +10,8 @@ struct PacienteDependencies {
     var resultadoArchivos: any ResultadoArchivoService
     var ambulancias: any AmbulanciaService
     var ambulanciaRealtime: any AmbulanciaRealtimeService
+    var hospitalizaciones: any HospitalizacionesService
+    var avisos: any AvisosService
     var ubicacion: @MainActor () -> any UbicacionService
 
     static func live(supabase: SupabaseClient?, api: APIClient) -> PacienteDependencies {
@@ -20,6 +22,8 @@ struct PacienteDependencies {
             resultadoArchivos: URLSessionResultadoArchivoService(),
             ambulancias: APIAmbulanciaService(client: api),
             ambulanciaRealtime: SupabaseAmbulanciaRealtimeService(client: supabase),
+            hospitalizaciones: APIHospitalizacionesService(client: api),
+            avisos: APIAvisosService(client: api),
             ubicacion: { CoreLocationUbicacionService() }
         )
     }

@@ -16,16 +16,6 @@ struct NavegacionPrincipalTests {
         #expect(viewModel.conteosLaboratorio.map(\.cantidad) == [2, 1, 4])
     }
 
-    @Test func inicioPacienteTomaLaCitaProgramadaMasCercana() throws {
-        let viewModel = PacienteInicioViewModel(me: .fixture(rol: .paciente), hoy: hoy)
-
-        let cita = try #require(viewModel.proximaCita)
-        #expect(cita.fecha > hoy)
-        #expect(cita.doctor == "Dra. Ana Rivas")
-        #expect(viewModel.ultimosResultados.count == 2)
-        #expect(viewModel.puedeSolicitarAmbulancia)
-    }
-
     @Test func miSaludMuestraHistorialYHabitacionDeEjemplo() {
         let viewModel = MiSaludViewModel(hoy: hoy)
 

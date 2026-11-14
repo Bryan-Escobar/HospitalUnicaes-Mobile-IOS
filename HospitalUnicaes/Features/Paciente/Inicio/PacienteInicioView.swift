@@ -3,10 +3,24 @@ import SwiftUI
 /// iOS-P1 Inicio del paciente. Cada tarjeta abre la pestaña que resume.
 struct PacienteInicioView: View {
     @State private var viewModel: PacienteInicioViewModel
+    @Environment(\.scenePhase) private var scenePhase
     private let onAbrir: (PacienteTab, MiSaludSegmento?) -> Void
 
-    init(me: Me, hoy: Date = Date(), onAbrir: @escaping (PacienteTab, MiSaludSegmento?) -> Void) {
-        _viewModel = State(initialValue: PacienteInicioViewModel(me: me, hoy: hoy))
+    init(
+        me: Me,
+        dependencies: PacienteDependencies,
+        hoy: @escaping () -> Date = Date.init,
+        onAbrir: @escaping (PacienteTab, MiSaludSegmento?) -> Void
+    ) {
+        _viewModel = State(initialValue: PacienteInicioViewModel(
+            me: me,
+            citas: dependencies.citas,
+            laboratorio: dependencies.laboratorio,
+            ambulancias: dependencies.ambulancias,
+            hospitalizaciones: dependencies.hospitalizaciones,
+            avisos: dependencies.avisos,
+            hoy: hoy
+        ))
         self.onAbrir = onAbrir
     }
 
@@ -18,21 +32,47 @@ struct PacienteInicioView: View {
                         .font(DSFont.bodySecondary)
                         .foregroundStyle(DSColor.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    proximaCita
-                    if let habitacion = viewModel.habitacion {
-                        habitacionCard(habitacion)
-                    }
-                    resultados
-                    ambulancia
-                    if let aviso = viewModel.aviso {
-                        DSBanner("\(aviso.titulo): \(aviso.detalle)", kind: .notice)
-                    }
+                    contenido
                     InformacionHospitalLink()
                 }
                 .pantallaPrincipal()
             }
+            .refreshable { await viewModel.cargar() }
             .background(DSColor.backgroundGrouped)
             .navigationTitle(viewModel.saludo)
+        }
+        .task { await viewModel.cargar() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await viewModel.cargar() } }
+        }
+    }
+
+    @ViewBuilder
+    private var contenido: some View {
+        if viewModel.isLoading {
+            ProgressView("Cargando tu información…")
+                .frame(maxWidth: .infinity, minHeight: 200)
+        } else if let message = viewModel.errorMessage {
+            VStack(spacing: DSSpacing.medium) {
+                DSBanner(message)
+                DSButton("Reintentar", systemImage: "arrow.clockwise") { Task { await viewModel.cargar() } }
+            }
+        } else {
+            if let parcial = viewModel.errorParcial {
+                VStack(spacing: DSSpacing.small) {
+                    DSBanner(parcial)
+                    DSButton("Reintentar", systemImage: "arrow.clockwise") { Task { await viewModel.cargar() } }
+                }
+            }
+            proximaCita
+            if let habitacion = viewModel.habitacion {
+                habitacionCard(habitacion)
+            }
+            resultados
+            ambulancia
+            if let aviso = viewModel.aviso {
+                DSBanner("\(aviso.titulo): \(aviso.detalle)", kind: .notice)
+            }
         }
     }
 
@@ -105,6 +145,11 @@ struct PacienteInicioView: View {
                     .font(DSFont.bodySecondaryEmphasis)
                     .foregroundStyle(DSColor.tint)
             }
+            if viewModel.ultimosResultados.isEmpty {
+                Text("Aún no tienes resultados de laboratorio.")
+                    .font(DSFont.bodySecondary)
+                    .foregroundStyle(DSColor.textSecondary)
+            }
             ForEach(viewModel.ultimosResultados) { resultado in
                 ResumenRow(
                     titulo: resultado.nombre,
@@ -124,7 +169,13 @@ struct PacienteInicioView: View {
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: DSSpacing.tiny) {
                     Text("Ambulancia").font(DSFont.bodySecondaryEmphasis)
-                    DSStatusBadge(viewModel.ambulancia.status)
+                    if let estado = viewModel.estadoAmbulancia {
+                        DSStatusBadge(estado.status)
+                    } else {
+                        Text("Estado no disponible")
+                            .font(DSFont.footnote)
+                            .foregroundStyle(DSColor.textSecondary)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 DSButton(
@@ -143,5 +194,5 @@ struct PacienteInicioView: View {
 }
 
 #Preview {
-    PacienteInicioView(me: .previewPaciente) { _, _ in }
+    PacienteInicioView(me: .previewPaciente, dependencies: .preview) { _, _ in }
 }

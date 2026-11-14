@@ -16,6 +16,8 @@ extension PacienteDependencies {
             resultadoArchivos: PreviewResultadoArchivoService(),
             ambulancias: PreviewAmbulanciaService(estadoInicial: estado, solicitudInicial: solicitud),
             ambulanciaRealtime: PreviewAmbulanciaRealtime(),
+            hospitalizaciones: PreviewPacienteHospitalizacionesService(),
+            avisos: PreviewAvisosService(),
             ubicacion: { PreviewUbicacionService() }
         )
     }
@@ -168,6 +170,29 @@ struct PreviewAmbulanciaRealtime: AmbulanciaRealtimeService {
         AsyncStream { continuation in
             continuation.yield(.conexion(.live))
         }
+    }
+}
+
+/// Hospitalización activa de ejemplo (HAB-204, cama A) como en el Figma.
+struct PreviewPacienteHospitalizacionesService: HospitalizacionesService {
+    func activa(pacienteId: UUID) async throws -> Hospitalizacion? {
+        Hospitalizacion(
+            id: UUID(),
+            paciente: PersonaResumen(id: pacienteId, nombres: "Carlos", apellidos: "Martínez"),
+            cama: CamaResumen(
+                id: UUID(), codigo: "HAB-204-A",
+                habitacion: HabitacionResumen(id: UUID(), codigo: "HAB-204", planta: 2, tipo: .semiprivada)
+            ),
+            doctorTratante: PacientePreviewData.doctorRivas,
+            fechaIngreso: Formatting.sumarDias(-2, a: Date()),
+            fechaAlta: nil, motivoIngreso: nil, estado: .activa
+        )
+    }
+}
+
+struct PreviewAvisosService: AvisosService {
+    func vigente() async throws -> Aviso? {
+        Aviso(titulo: "Aviso", detalle: "el horario de visitas cambia a 2:00–6:00 p. m. desde el lunes.")
     }
 }
 
