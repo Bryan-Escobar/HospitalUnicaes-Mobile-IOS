@@ -11,6 +11,9 @@ extension DoctorDependencies {
             hospitalizaciones: PreviewHospitalizacionesService(),
             consultas: PreviewConsultasService(),
             laboratorio: PreviewLaboratorioService(),
+            ordenesLaboratorio: PreviewOrdenesLaboratorioDoctorService(),
+            ambulancias: PreviewAmbulanciaService(estadoInicial: .enServicio, solicitudInicial: nil),
+            avisos: PreviewAvisosService(),
             onIniciarConsulta: { _ in }
         )
     }
@@ -235,3 +238,12 @@ extension NuevaConsultaViewModel {
     }
 }
 #endif
+
+/// Sin órdenes: Inicio muestra los conteos en cero.
+struct PreviewOrdenesLaboratorioDoctorService: LaboratorioPacienteService {
+    func misOrdenes() async throws -> [OrdenLaboratorioPaciente] { [] }
+
+    func urlArchivo(ordenId: UUID, examenId: UUID) async throws -> ArchivoFirmado {
+        throw ResultadoArchivoError.fallo
+    }
+}

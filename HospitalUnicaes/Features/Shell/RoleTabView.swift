@@ -30,7 +30,7 @@ struct DoctorTabView: View {
 
     var body: some View {
         TabView(selection: $tab) {
-            DoctorInicioView(me: me) { tab = $0 }
+            DoctorInicioView(me: me, dependencies: dependencies) { tab = $0 }
                 .tabItem { TabLabel(title: "Inicio", systemImage: "house") }
                 .tag(DoctorTab.inicio)
             AgendaView(dependencies: dependencies)
@@ -70,7 +70,7 @@ struct PacienteTabView: View {
 
     var body: some View {
         TabView(selection: $tab) {
-            PacienteInicioView(me: me) { destino, segmento in
+            PacienteInicioView(me: me, dependencies: dependencies) { destino, segmento in
                 if let segmento { miSalud.segmento = segmento }
                 tab = destino
             }
