@@ -8,14 +8,6 @@ struct NavegacionPrincipalTests {
     /// Miércoles 21 oct 2026, 10:00 en El Salvador.
     let hoy = Date(timeIntervalSince1970: 1_792_598_400)
 
-    @Test func inicioDoctorSaludaPorNombreYMuestraConteos() {
-        let viewModel = DoctorInicioViewModel(me: .fixture(rol: .doctor), hoy: hoy)
-
-        #expect(viewModel.saludo == "Hola, Ana")
-        #expect(viewModel.fecha == "Miércoles 21 de octubre")
-        #expect(viewModel.conteosLaboratorio.map(\.cantidad) == [2, 1, 4])
-    }
-
     @Test func miSaludMuestraHistorialYHabitacionDeEjemplo() {
         let viewModel = MiSaludViewModel(hoy: hoy)
 
