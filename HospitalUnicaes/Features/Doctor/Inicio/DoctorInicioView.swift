@@ -3,10 +3,24 @@ import SwiftUI
 /// iOS-D1 Inicio (Figma). La próxima cita abre la pestaña Agenda.
 struct DoctorInicioView: View {
     @State private var viewModel: DoctorInicioViewModel
+    @Environment(\.scenePhase) private var scenePhase
     private let onAbrir: (DoctorTab) -> Void
 
-    init(me: Me, hoy: Date = Date(), onAbrir: @escaping (DoctorTab) -> Void) {
-        _viewModel = State(initialValue: DoctorInicioViewModel(me: me, hoy: hoy))
+    init(
+        me: Me,
+        dependencies: DoctorDependencies,
+        hoy: @escaping () -> Date = Date.init,
+        onAbrir: @escaping (DoctorTab) -> Void
+    ) {
+        _viewModel = State(initialValue: DoctorInicioViewModel(
+            me: me,
+            turnos: dependencies.turnos,
+            citas: dependencies.citas,
+            laboratorio: dependencies.ordenesLaboratorio,
+            ambulancias: dependencies.ambulancias,
+            avisos: dependencies.avisos,
+            hoy: hoy
+        ))
         self.onAbrir = onAbrir
     }
 
@@ -18,24 +32,62 @@ struct DoctorInicioView: View {
                         .font(DSFont.bodySecondary)
                         .foregroundStyle(DSColor.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    if let turno = viewModel.resumen.turno {
-                        turnoCard(turno)
-                    }
-                    if let cita = viewModel.resumen.proximaCita {
-                        proximaCitaCard(cita)
-                    }
-                    laboratorioCard
-                    ambulanciaCard
-                    if let aviso = viewModel.resumen.aviso {
-                        DSBanner("\(aviso.titulo): \(aviso.detalle)", kind: .notice)
-                    }
+                    contenido
                     InformacionHospitalLink()
                 }
                 .pantallaPrincipal()
             }
+            .refreshable { await viewModel.cargar() }
             .doctorScreen()
             .navigationTitle(viewModel.saludo)
         }
+        .task { await viewModel.cargar() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await viewModel.cargar() } }
+        }
+    }
+
+    @ViewBuilder
+    private var contenido: some View {
+        if viewModel.isLoading {
+            ProgressView("Cargando tu información…")
+                .frame(maxWidth: .infinity, minHeight: 200)
+        } else if let message = viewModel.errorMessage {
+            VStack(spacing: DSSpacing.medium) {
+                DSBanner(message)
+                DSButton("Reintentar", systemImage: "arrow.clockwise") { Task { await viewModel.cargar() } }
+            }
+        } else {
+            if let parcial = viewModel.errorParcial {
+                DSBanner(parcial)
+            }
+            if let turno = viewModel.resumen.turno {
+                turnoCard(turno)
+            } else {
+                sinTurnoCard
+            }
+            if let cita = viewModel.resumen.proximaCita {
+                proximaCitaCard(cita)
+            }
+            laboratorioCard
+            if viewModel.resumen.ambulancia != nil {
+                ambulanciaCard
+            }
+            if let aviso = viewModel.resumen.aviso {
+                DSBanner("\(aviso.titulo): \(aviso.detalle)", kind: .notice)
+            }
+        }
+    }
+
+    private var sinTurnoCard: some View {
+        Button { onAbrir(.turnos) } label: {
+            DSCard {
+                Text("Turno de hoy").dsEyebrow().foregroundStyle(DSColor.textSecondary)
+                Text("No tienes turno hoy").font(DSFont.subtitle)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Abre tus turnos")
     }
 
     private func turnoCard(_ turno: DoctorInicioResumen.Turno) -> some View {
@@ -112,7 +164,7 @@ struct DoctorInicioView: View {
                     Text("Solo lectura").font(DSFont.footnote).foregroundStyle(DSColor.textSecondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                DSStatusBadge(viewModel.resumen.ambulancia.status)
+                if let estado = viewModel.resumen.ambulancia { DSStatusBadge(estado.status) }
             }
         }
         .accessibilityElement(children: .combine)
@@ -120,5 +172,5 @@ struct DoctorInicioView: View {
 }
 
 #Preview {
-    DoctorInicioView(me: .previewDoctor) { _ in }
+    DoctorInicioView(me: .previewDoctor, dependencies: .preview) { _ in }
 }

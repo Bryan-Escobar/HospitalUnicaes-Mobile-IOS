@@ -30,7 +30,7 @@ struct DoctorTabView: View {
 
     var body: some View {
         TabView(selection: $tab) {
-            DoctorInicioView(me: me) { tab = $0 }
+            DoctorInicioView(me: me, dependencies: dependencies) { tab = $0 }
                 .tabItem { TabLabel(title: "Inicio", systemImage: "house") }
                 .tag(DoctorTab.inicio)
             AgendaView(dependencies: dependencies)
