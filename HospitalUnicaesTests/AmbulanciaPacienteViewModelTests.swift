@@ -198,4 +198,138 @@ struct AmbulanciaPacienteViewModelTests {
         #expect(vm.tipo == nil)
         #expect(vm.direccion.isEmpty)
     }
+
+    @Test func alInicioEstaCargandoYSinConexion() {
+        let vm = viewModel()
+        #expect(vm.pantalla == .cargando)
+        #expect(vm.estadoAmbulancia == nil)
+        #expect(vm.conexion == .reconnecting)
+        #expect(!vm.puedeConfirmar)
+    }
+
+    @Test func siFallaLaSolicitudInicialAbreElFormulario() async {
+        api.ultimaResult = .failure(URLError(.timedOut))
+        let vm = viewModel()
+        await vm.recargar()
+        #expect(vm.pantalla == .formulario)
+        #expect(vm.errorRecarga == nil)
+        #expect(vm.disponible)
+    }
+
+    @Test func errorAlRecargarElSeguimientoConservaLaUltimaYSeLimpiaAlRecuperar() async {
+        api.ultimaResult = .success(AmbulanciaFixtures.solicitud(.despachada))
+        let vm = viewModel()
+        await vm.recargar()
+
+        api.solicitudResult = .failure(URLError(.notConnectedToInternet))
+        await vm.recargar()
+        #expect(vm.solicitud?.estado == .despachada)
+        #expect(vm.errorRecarga == AmbulanciaPacienteViewModel.errorSeguimiento)
+
+        api.solicitudResult = .success(AmbulanciaFixtures.solicitud(.despachada))
+        await vm.recargar()
+        #expect(vm.errorRecarga == nil)
+    }
+
+    @Test func unaSolicitudTerminalSeSigueMostrandoEnElSeguimiento() async {
+        api.ultimaResult = .success(AmbulanciaFixtures.solicitud(.despachada))
+        let vm = viewModel()
+        await vm.recargar()
+
+        let cierre = AmbulanciaFixtures.enviada.addingTimeInterval(900)
+        api.solicitudResult = .success(AmbulanciaFixtures.solicitud(.finalizada, cierre: cierre))
+        await vm.recargar()
+
+        #expect(vm.solicitud?.estado == .finalizada)
+    }
+
+    @Test func unaRecargaFallidaDelEstadoConservaLoConocido() async {
+        let vm = viewModel()
+        await vm.recargar()
+        #expect(vm.disponible)
+
+        api.estadoResult = .failure(URLError(.timedOut))
+        await vm.recargar()
+
+        #expect(vm.disponible)
+        #expect(vm.errorCarga == nil)
+    }
+
+    @Test func reintentarTrasElErrorDeEstadoHabilitaElFormulario() async {
+        api.estadoResult = .failure(URLError(.notConnectedToInternet))
+        let vm = viewModel()
+        await vm.recargar()
+        #expect(vm.errorCarga != nil)
+
+        api.estadoResult = .success(AmbulanciaFixtures.ambulancia(.disponible))
+        await vm.recargar()
+
+        #expect(vm.errorCarga == nil)
+        #expect(vm.disponible)
+    }
+
+    @Test func errorGenericoDelGPSPideEscribirLaDireccion() async {
+        gps.result = .failure(URLError(.timedOut))
+        let vm = viewModel()
+        await vm.alternarUbicacion()
+        #expect(vm.gps == .error("No se pudo obtener tu ubicación · Escribe la dirección"))
+        #expect(!vm.usarGPS)
+        #expect(!vm.tieneUbicacion)
+    }
+
+    @Test func apagarElGPSQuitaLasCoordenadas() async {
+        let vm = viewModel()
+        vm.tipo = .accidente
+        await vm.alternarUbicacion()
+        #expect(vm.tieneUbicacion)
+        #expect(vm.cuerpoSolicitud?.latitud != nil)
+
+        await vm.alternarUbicacion()
+
+        #expect(!vm.usarGPS)
+        #expect(!vm.tieneUbicacion)
+        #expect(vm.cuerpoSolicitud == nil)
+    }
+
+    @Test func pedirConfirmacionSoloConElFormularioCompleto() async {
+        let vm = viewModel()
+        await vm.recargar()
+        vm.pedirConfirmacion()
+        #expect(!vm.mostrarConfirmacion)
+
+        vm.tipo = .cardiaca
+        vm.direccion = "Calle Arce 12"
+        vm.pedirConfirmacion()
+        #expect(vm.mostrarConfirmacion)
+    }
+
+    @Test func limiteSinSolicitudAbiertaMuestraVacioYSePuedeSolicitarOtra() async {
+        let vm = viewModel()
+        await vm.recargar()
+        api.solicitarResult = .failure(APIError(statusCode: 429, code: "LIMITE_SOLICITUDES"))
+        vm.tipo = .accidente
+        vm.direccion = "Calle Arce 12"
+
+        await vm.solicitar()
+        #expect(vm.pantalla == .vacio)
+
+        vm.solicitarOtra()
+        #expect(vm.pantalla == .formulario)
+        #expect(vm.tipo == nil)
+    }
+
+    @Test func sinInternetAlSolicitarMuestraElErrorYConservaElFormulario() async {
+        let vm = viewModel()
+        await vm.recargar()
+        api.solicitarResult = .failure(URLError(.notConnectedToInternet))
+        vm.tipo = .accidente
+        vm.direccion = "Calle Arce 12"
+
+        await vm.solicitar()
+
+        #expect(vm.pantalla == .formulario)
+        #expect(vm.errorEnvio == "No hay conexión. Revisa tu internet e intenta de nuevo.")
+        #expect(!vm.enviando)
+        #expect(vm.puedeConfirmar)
+    }
 }

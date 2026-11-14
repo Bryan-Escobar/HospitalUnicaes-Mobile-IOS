@@ -7,9 +7,17 @@ final class FakeCitasPacienteService: CitasPacienteService, @unchecked Sendable 
     var solicitudesResult: Result<[SolicitudAtencion], Error> = .success([])
     var especialidadesResult: Result<[Especialidad], Error> = .success([])
     var enviarResult: Result<SolicitudAtencion, Error>?
+    /// Si se asigna, `citas()` espera a que el test la abra: permite observar el estado "cargando".
+    var gate: AsyncGate?
     private(set) var enviadas: [NuevaSolicitudAtencion] = []
 
-    func citas() async throws -> [Cita] { try citasResult.get() }
+    private(set) var llamadasCitas = 0
+
+    func citas() async throws -> [Cita] {
+        llamadasCitas += 1
+        await gate?.wait()
+        return try citasResult.get()
+    }
     func solicitudes() async throws -> [SolicitudAtencion] { try solicitudesResult.get() }
     func especialidades() async throws -> [Especialidad] { try especialidadesResult.get() }
 
@@ -90,6 +98,88 @@ struct CitasPacienteViewModelTests {
         #expect(!viewModel.estaVacio)
     }
 
+    @Test func cargandoSoloLaPrimeraVezYLuegoRefrescaEnSilencio() async {
+        let service = FakeCitasPacienteService()
+        let primeraCompuerta = AsyncGate()
+        service.gate = primeraCompuerta
+        let viewModel = CitasPacienteViewModel(service: service, hoy: { hoy })
+
+        let primera = Task { await viewModel.cargar() }
+        await esperar { viewModel.isLoading }
+        #expect(viewModel.isLoading)
+        #expect(!viewModel.cargado)
+        #expect(!viewModel.estaVacio)
+        primeraCompuerta.open()
+        await primera.value
+        #expect(!viewModel.isLoading)
+        #expect(viewModel.cargado)
+
+        let segundaCompuerta = AsyncGate()
+        service.gate = segundaCompuerta
+        let segunda = Task { await viewModel.cargar() }
+        await esperar { service.llamadasCitas == 2 }
+        #expect(service.llamadasCitas == 2)
+        #expect(!viewModel.isLoading)
+        segundaCompuerta.open()
+        await segunda.value
+    }
+
+    @Test func siFallanSoloLasSolicitudesTambienEsError() async {
+        let service = FakeCitasPacienteService()
+        service.citasResult = .success([DoctorFixtures.cita(fecha: salvador(2026, 10, 22, 9))])
+        service.solicitudesResult = .failure(APIError(statusCode: 500, code: "HTTP_500"))
+        let viewModel = CitasPacienteViewModel(service: service, hoy: { hoy })
+
+        await viewModel.cargar()
+
+        #expect(viewModel.errorMessage == "No se pudieron cargar tus citas.")
+        #expect(!viewModel.cargado)
+        #expect(!viewModel.isLoading)
+        #expect(viewModel.citas.isEmpty)
+    }
+
+    @Test func reintentarTrasElErrorMuestraLasCitasYLimpiaElMensaje() async {
+        let service = FakeCitasPacienteService()
+        service.citasResult = .failure(URLError(.timedOut))
+        let viewModel = CitasPacienteViewModel(service: service, hoy: { hoy })
+        await viewModel.cargar()
+        #expect(viewModel.errorMessage != nil)
+
+        service.citasResult = .success([DoctorFixtures.cita(fecha: salvador(2026, 10, 22, 9), motivo: "Control")])
+        await viewModel.cargar()
+
+        #expect(viewModel.errorMessage == nil)
+        #expect(viewModel.cargado)
+        #expect(viewModel.proximas.map(\.motivo) == ["Control"])
+    }
+
+    @Test func unaRecargaFallidaConservaLasCitasYAvisa() async {
+        let service = FakeCitasPacienteService()
+        service.citasResult = .success([DoctorFixtures.cita(fecha: salvador(2026, 10, 22, 9), motivo: "Control")])
+        let viewModel = CitasPacienteViewModel(service: service, hoy: { hoy })
+        await viewModel.cargar()
+
+        service.citasResult = .failure(URLError(.notConnectedToInternet))
+        await viewModel.cargar()
+
+        #expect(viewModel.proximas.map(\.motivo) == ["Control"])
+        #expect(viewModel.errorMessage == "No se pudieron cargar tus citas.")
+        #expect(viewModel.cargado)
+    }
+
+    @Test func elVacioDependeDelSegmentoElegido() async {
+        let service = FakeCitasPacienteService()
+        service.citasResult = .success([DoctorFixtures.cita(fecha: salvador(2026, 10, 14, 9), estado: .atendida)])
+        let viewModel = CitasPacienteViewModel(service: service, hoy: { hoy })
+
+        await viewModel.cargar()
+
+        #expect(viewModel.segmento == .proximas)
+        #expect(viewModel.estaVacio)
+        viewModel.segmento = .pasadas
+        #expect(!viewModel.estaVacio)
+    }
+
     @Test func laSolicitudEnviadaSubeArriba() async {
         let viewModel = CitasPacienteViewModel(service: FakeCitasPacienteService(), hoy: { hoy })
         viewModel.segmento = .pasadas
@@ -133,6 +223,56 @@ struct CitasPacienteViewModelTests {
         _ = try #require(await formulario.enviar())
 
         #expect(service.enviadas.first?.especialidadId == nil)
+    }
+
+    @Test func motivoMuyCortoNoSeEnvia() async {
+        let service = FakeCitasPacienteService()
+        let formulario = SolicitarCitaViewModel(service: service, hoy: { hoy })
+        formulario.motivo = " ab "
+
+        #expect(await formulario.enviar() == nil)
+
+        #expect(formulario.motivoError != nil)
+        #expect(service.enviadas.isEmpty)
+    }
+
+    @Test func siElCatalogoNoCargaElFormularioSigueConNoSe() async throws {
+        let service = FakeCitasPacienteService()
+        service.especialidadesResult = .failure(URLError(.notConnectedToInternet))
+        let formulario = SolicitarCitaViewModel(service: service, hoy: { hoy })
+        await formulario.cargarEspecialidades()
+        #expect(formulario.opcionesEspecialidad == ["No sé"])
+
+        formulario.motivo = "Control"
+        _ = try #require(await formulario.enviar())
+
+        #expect(service.enviadas.first?.especialidadId == nil)
+    }
+
+    @Test func unDiaPasadoSeAjustaAHoy() async throws {
+        let service = FakeCitasPacienteService()
+        let formulario = SolicitarCitaViewModel(service: service, hoy: { hoy })
+        formulario.motivo = "Control"
+        formulario.diaPreferido = salvador(2026, 10, 1)
+
+        _ = try #require(await formulario.enviar())
+
+        #expect(service.enviadas.first?.fechaPreferida == "2026-10-21")
+    }
+
+    @Test func sinInternetElFormularioMuestraElErrorYSePuedeReintentar() async throws {
+        let service = FakeCitasPacienteService()
+        service.enviarResult = .failure(URLError(.notConnectedToInternet))
+        let formulario = SolicitarCitaViewModel(service: service, hoy: { hoy })
+        formulario.motivo = "Control"
+
+        #expect(await formulario.enviar() == nil)
+        #expect(formulario.errorMessage == "No hay conexión. Revisa tu internet e intenta de nuevo.")
+        #expect(!formulario.isSending)
+
+        service.enviarResult = nil
+        _ = try #require(await formulario.enviar())
+        #expect(formulario.errorMessage == nil)
     }
 
     @Test func muestraElRechazoDeLaBase() async {

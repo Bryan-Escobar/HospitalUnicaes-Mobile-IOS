@@ -137,6 +137,102 @@ struct NuevaConsultaViewModelTests {
         #expect(viewModel.recetas[0].enviada)
     }
 
+    @Test func sinDiagnosticoNoGuardaYMarcaElCampo() async {
+        let viewModel = make()
+        viewModel.diagnostico = "  "
+
+        await viewModel.guardar()
+
+        #expect(consultas.calls.isEmpty)
+        #expect(!viewModel.guardada)
+        #expect(viewModel.diagnosticoError == "El diagnóstico es obligatorio")
+    }
+
+    @Test func errorDeRedNoBloqueaYElReintentoGuarda() async {
+        let viewModel = make()
+        viewModel.diagnostico = "Rinitis"
+        consultas.failCall = ("crearConsulta", 1)
+        consultas.error = URLError(.notConnectedToInternet)
+
+        await viewModel.guardar()
+
+        #expect(viewModel.errorMessage == "No hay conexión. Revisa tu internet e intenta de nuevo.")
+        #expect(viewModel.canSave)
+        #expect(!viewModel.isSaving)
+        #expect(!viewModel.tieneAvanceParcial)
+
+        await viewModel.guardar()
+
+        #expect(viewModel.guardada)
+        #expect(viewModel.errorMessage == nil)
+    }
+
+    @Test func lasNotasSeEnvianYSeBloqueanCuandoLaConsultaYaExiste() async {
+        let viewModel = make(notas: "  Paciente con tos seca ")
+        viewModel.diagnostico = "Rinitis"
+        #expect(!viewModel.notasBloqueadas)
+        consultas.failCall = ("agregarDiagnostico", 1)
+
+        await viewModel.guardar()
+
+        #expect(consultas.consultas.first?.notas == "Paciente con tos seca")
+        #expect(viewModel.notasBloqueadas)
+        #expect(!viewModel.diagnosticoBloqueado)
+    }
+
+    @Test func siFallaUnaOrdenElReintentoSoloEnviaLaFaltante() async {
+        let viewModel = make()
+        viewModel.diagnostico = "Rinitis"
+        viewModel.agregarReceta(receta("Uno"))
+        viewModel.agregarOrden(orden("Hemograma completo"))
+        viewModel.agregarOrden(orden("Glucosa"))
+        laboratorio.failCall = ("crearOrden", 2)
+
+        await viewModel.guardar()
+
+        #expect(viewModel.errorMessage != nil)
+        #expect(viewModel.diagnosticoBloqueado)
+        #expect(viewModel.tieneAvanceParcial)
+        #expect(viewModel.ordenes.map(\.enviada) == [true, false])
+        #expect(laboratorio.ordenes.count == 1)
+
+        laboratorio.failCall = nil
+        await viewModel.guardar()
+
+        #expect(consultas.calls.filter { $0 == "crearConsulta" }.count == 1)
+        #expect(consultas.calls.filter { $0 == "emitirReceta" }.count == 1)
+        #expect(laboratorio.ordenes.count == 2)
+        #expect(laboratorio.calls.filter { $0 == "crearOrden" }.count == 3)
+        #expect(viewModel.ordenes.allSatisfy { $0.enviada })
+        #expect(viewModel.guardada)
+    }
+
+    @Test func noAgregaDosVecesElMismoExamen() {
+        let viewModel = make()
+        let examen = ExamenCatalogo(id: UUID(), nombre: "Glucosa", categoria: nil, tipoMuestra: nil)
+
+        viewModel.agregarOrden(OrdenBorrador(id: UUID(), examen: examen, indicaciones: ""))
+        viewModel.agregarOrden(OrdenBorrador(id: UUID(), examen: examen, indicaciones: ""))
+
+        #expect(viewModel.ordenes.count == 1)
+        #expect(viewModel.examenesYaAgregados == [examen.id])
+    }
+
+    @Test func laSalidaDependeDelAvance() async {
+        let viewModel = make()
+        #expect(viewModel.prepararSalida() == .cerrar)
+        #expect(!viewModel.debeConfirmarSalida)
+
+        viewModel.diagnostico = "Rinitis"
+        #expect(viewModel.prepararSalida() == .descartar)
+        #expect(viewModel.debeConfirmarSalida)
+
+        consultas.failCall = ("agregarDiagnostico", 1)
+        await viewModel.guardar()
+        #expect(viewModel.prepararSalida() == .parcial)
+        #expect(viewModel.debeConfirmarSalida)
+    }
+
     private func receta(_ nombre: String) -> RecetaBorrador {
         RecetaBorrador(
             id: UUID(), medicamento: nombre, dosis: "1 tableta", frecuencia: "Cada 24 h",
@@ -144,10 +240,10 @@ struct NuevaConsultaViewModelTests {
         )
     }
 
-    private func orden() -> OrdenBorrador {
+    private func orden(_ nombre: String = "Hemograma completo") -> OrdenBorrador {
         OrdenBorrador(
             id: UUID(),
-            examen: ExamenCatalogo(id: UUID(), nombre: "Hemograma completo", categoria: nil, tipoMuestra: nil),
+            examen: ExamenCatalogo(id: UUID(), nombre: nombre, categoria: nil, tipoMuestra: nil),
             indicaciones: ""
         )
     }

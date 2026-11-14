@@ -12,6 +12,8 @@ final class FakeAuthService: AuthService, @unchecked Sendable {
     private(set) var signOutCount = 0
     var resetError: Error?
     private(set) var resetEmails: [String] = []
+    /// Si se asigna, `signIn` espera a que el test la abra: permite observar el estado "cargando".
+    var signInGate: AsyncGate?
 
     func currentUser() async throws -> AppUser? {
         if let currentUserError { throw currentUserError }
@@ -20,6 +22,7 @@ final class FakeAuthService: AuthService, @unchecked Sendable {
 
     func signIn(email: String, password: String) async throws -> AppUser {
         signInCalls.append((email, password))
+        await signInGate?.wait()
         let user = try signInResult.get()
         storedUser = user
         return user
@@ -89,5 +92,25 @@ extension Me {
                 id: UUID(), tipo: .init(id: UUID(), nombre: "Médico"), especialidad: especialidad, codigoEmpleado: "EMP-1"
             )
         )
+    }
+}
+
+/// Compuerta determinista: el fake espera en `wait()` hasta que el test llama a `open()`.
+/// `open()` antes de `wait()` también funciona (la señal queda en el buffer).
+final class AsyncGate: @unchecked Sendable {
+    private let stream: AsyncStream<Void>
+    private let continuation: AsyncStream<Void>.Continuation
+
+    init() {
+        (stream, continuation) = AsyncStream<Void>.makeStream()
+    }
+
+    func wait() async {
+        for await _ in stream { return }
+    }
+
+    func open() {
+        continuation.yield()
+        continuation.finish()
     }
 }
