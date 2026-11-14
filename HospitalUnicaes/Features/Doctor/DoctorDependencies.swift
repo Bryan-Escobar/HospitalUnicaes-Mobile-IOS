@@ -10,6 +10,10 @@ struct DoctorDependencies {
     var hospitalizaciones: any HospitalizacionesService
     var consultas: any ConsultasService
     var laboratorio: any LaboratorioService
+    /// Órdenes de laboratorio que ve el doctor (`GET laboratorio/ordenes`), para los conteos de Inicio.
+    var ordenesLaboratorio: any LaboratorioPacienteService
+    var ambulancias: any AmbulanciaService
+    var avisos: any AvisosService
     var onIniciarConsulta: @MainActor (Cita) -> Void
 
     static func live(supabase: SupabaseClient?, api: APIClient) -> DoctorDependencies {
@@ -20,6 +24,9 @@ struct DoctorDependencies {
             hospitalizaciones: APIHospitalizacionesService(client: api),
             consultas: APIConsultasService(client: api),
             laboratorio: APILaboratorioService(client: api),
+            ordenesLaboratorio: APILaboratorioPacienteService(client: api),
+            ambulancias: APIAmbulanciaService(client: api),
+            avisos: APIAvisosService(client: api),
             onIniciarConsulta: { _ in }
         )
     }
