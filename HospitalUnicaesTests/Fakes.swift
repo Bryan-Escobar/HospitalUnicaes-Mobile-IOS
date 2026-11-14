@@ -6,7 +6,6 @@ final class FakeAuthService: AuthService, @unchecked Sendable {
     var storedUser: AppUser?
     var currentUserError: Error?
     var signInResult: Result<AppUser, Error> = .success(AppUser(id: UUID(), email: "doctor@demo.test"))
-    var signUpHasSession = true
 
     private(set) var signInCalls: [(email: String, password: String)] = []
     private(set) var signOutCount = 0
@@ -24,8 +23,6 @@ final class FakeAuthService: AuthService, @unchecked Sendable {
         storedUser = user
         return user
     }
-
-    func signUp(email: String, password: String) async throws -> Bool { signUpHasSession }
 
     func signOut() async throws {
         signOutCount += 1

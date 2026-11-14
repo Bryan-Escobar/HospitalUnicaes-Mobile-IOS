@@ -8,9 +8,9 @@ struct HospitalUnicaesApp: App {
 
     init() {
         #if DEBUG
-        // `-HUPreviewEmail doctor@demo.test` abre la app con ese perfil simulado, sin Supabase.
+        // `-HUPreviewEmail doctor@demo.test` abre la app con ese perfil de muestra, sin Supabase.
         if let email = UserDefaults.standard.string(forKey: "HUPreviewEmail") {
-            let me = MockMeService.me(email: email)
+            let me = Me.preview(email: email)
             let state: SessionViewModel.State = me.rol.usesIOSApp ? .signedIn(me) : .accesoNoDisponible(me)
             _session = State(initialValue: .preview(state))
             _doctorDependencies = State(initialValue: .preview)
@@ -21,9 +21,7 @@ struct HospitalUnicaesApp: App {
         let supabase = SupabaseClientFactory.make()
         let authService = SupabaseAuthService(client: supabase)
         let apiClient = APIClient { try await authService.accessToken() }
-        let meService: MeService = AppConfig.useMockMe
-            ? MockMeService(authService: authService)
-            : APIMeService(client: apiClient)
+        let meService = APIMeService(client: apiClient)
         _session = State(initialValue: SessionViewModel(authService: authService, meService: meService))
         _doctorDependencies = State(initialValue: .live(supabase: supabase, api: apiClient))
         _pacienteDependencies = State(initialValue: .live(supabase: supabase, api: apiClient))

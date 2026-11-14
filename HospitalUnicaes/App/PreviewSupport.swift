@@ -13,7 +13,6 @@ struct PreviewAuthService: AuthService {
         try await Task.sleep(for: .seconds(1))
         throw AuthServiceError.invalidCredentials
     }
-    func signUp(email: String, password: String) async throws -> Bool { true }
     func signOut() async throws {}
     func resetPassword(email: String) async throws {}
     func accessToken() async throws -> String? { nil }
@@ -27,10 +26,59 @@ struct PreviewHealthService: HealthService {
 }
 
 extension Me {
-    static let previewDoctor = MockMeService.me(email: "doctor@demo.hospitalunicaes.test")
-    static let previewPaciente = MockMeService.me(email: "paciente@demo.hospitalunicaes.test")
-    static let previewRecepcion = MockMeService.me(email: "recepcion@demo.hospitalunicaes.test")
-    static let previewAdmin = MockMeService.me(email: "administrador@demo.hospitalunicaes.test")
+    static let previewDoctor = Me.preview(email: "doctor@demo.hospitalunicaes.test")
+    static let previewPaciente = Me.preview(email: "paciente@demo.hospitalunicaes.test")
+    static let previewRecepcion = Me.preview(email: "recepcion@demo.hospitalunicaes.test")
+    static let previewAdmin = Me.preview(email: "administrador@demo.hospitalunicaes.test")
+
+    /// Rol de un perfil de muestra según el correo: `doctor@…`, `recepcion@…`, `admin@…`/`administrador@…`;
+    /// cualquier otro es `paciente`. Solo para Previews y `-HUPreviewEmail`.
+    static func previewRole(forEmail email: String) -> UserRole {
+        let local = email.lowercased().split(separator: "@").first.map(String.init) ?? ""
+        if local.hasPrefix("doctor") { return .doctor }
+        if local.hasPrefix("recepcion") { return .recepcionista }
+        if local.hasPrefix("admin") { return .administrador }
+        return .paciente
+    }
+
+    /// Perfil de muestra con datos ficticios para Previews y `-HUPreviewEmail`.
+    static func preview(email: String) -> Me {
+        let rol = previewRole(forEmail: email)
+        let demo: (nombres: String, apellidos: String) = switch rol {
+        case .administrador: ("Andrea", "Méndez Ruiz")
+        case .doctor: ("Roberto", "Castillo Peña")
+        case .recepcionista: ("Lucía", "Herrera Gómez")
+        case .paciente: ("Carlos", "Martínez Rivas")
+        }
+        let personal: PersonalResumen? = switch rol {
+        case .doctor:
+            PersonalResumen(id: UUID(), tipo: .init(id: UUID(), nombre: "Médico"), especialidad: "Alergista", codigoEmpleado: "EMP-0002")
+        case .recepcionista:
+            PersonalResumen(id: UUID(), tipo: .init(id: UUID(), nombre: "Recepcionista"), especialidad: nil, codigoEmpleado: "EMP-0003")
+        case .administrador, .paciente:
+            nil
+        }
+        return Me(
+            id: UUID(),
+            email: email,
+            nombres: demo.nombres,
+            apellidos: demo.apellidos,
+            telefono: "7000-0000",
+            avatarUrl: nil,
+            rol: rol,
+            activo: true,
+            pacienteId: rol == .paciente ? UUID() : nil,
+            personal: personal
+        )
+    }
+}
+
+/// `MeService` en memoria para las Previews: nunca llama a la API.
+struct PreviewMeService: MeService {
+    var me: Me
+
+    func fetchMe() async throws -> Me { me }
+    func registrar(_ request: RegistroPacienteRequest) async throws -> Me { me }
 }
 
 extension SessionViewModel {
@@ -39,8 +87,15 @@ extension SessionViewModel {
         case .signedIn(let me), .accesoNoDisponible(let me): me.email
         default: nil
         }
-        let auth = PreviewAuthService(email: email)
-        return SessionViewModel(authService: auth, meService: MockMeService(authService: auth), state: state)
+        let me: Me = switch state {
+        case .signedIn(let me), .accesoNoDisponible(let me): me
+        default: .previewPaciente
+        }
+        return SessionViewModel(
+            authService: PreviewAuthService(email: email),
+            meService: PreviewMeService(me: me),
+            state: state
+        )
     }
 }
 #endif
