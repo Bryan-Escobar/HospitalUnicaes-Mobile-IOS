@@ -63,7 +63,7 @@ struct ModelsTests {
         ("admin@x.com", .administrador),
         ("carlos@correo.com", .paciente),
     ])
-    func mockAsignaRolPorCorreo(email: String, rol: UserRole) {
-        #expect(MockMeService.role(forEmail: email) == rol)
+    func previewAsignaRolPorCorreo(email: String, rol: UserRole) {
+        #expect(Me.previewRole(forEmail: email) == rol)
     }
 }

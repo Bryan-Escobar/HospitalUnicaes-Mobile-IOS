@@ -16,10 +16,6 @@ protocol AuthService: Sendable {
     /// pero ya no se puede refrescar.
     func currentUser() async throws -> AppUser?
     func signIn(email: String, password: String) async throws -> AppUser
-    /// Crea la cuenta directo en Supabase Auth. Solo lo usa `MockMeService`: en la app real
-    /// el registro pasa por `POST /api/auth/registro`.
-    /// - Returns: `true` si quedó con sesión; `false` si falta confirmar el correo.
-    func signUp(email: String, password: String) async throws -> Bool
     func signOut() async throws
     func resetPassword(email: String) async throws
     /// Access token vigente para el header `Authorization: Bearer` de la API.
@@ -85,11 +81,6 @@ final class SupabaseAuthService: AuthService {
             default: throw error
             }
         }
-    }
-
-    func signUp(email: String, password: String) async throws -> Bool {
-        guard let client else { throw AuthServiceError.missingConfiguration }
-        return try await client.auth.signUp(email: email, password: password).session != nil
     }
 
     func signOut() async throws {

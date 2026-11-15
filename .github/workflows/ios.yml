@@ -70,7 +70,7 @@ jobs:
           restore-keys: spm-${{ runner.os }}-
 
       # Config/Secrets.xcconfig no existe en CI: Dev.xcconfig lo incluye con
-      # `#include?`, así que compila con valores vacíos y USE_MOCK_ME = YES.
+      # `#include?`, así que compila con valores vacíos.
       - name: Elegir simulador
         run: |
           id=$(xcodebuild -project HospitalUnicaes.xcodeproj -scheme HospitalUnicaes \
