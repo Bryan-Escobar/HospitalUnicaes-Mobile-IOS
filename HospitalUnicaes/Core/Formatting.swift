@@ -73,6 +73,11 @@ enum Formatting {
         texto(date, formato: "HH:mm")
     }
 
+    /// `07:00–15:00` a partir de las horas de Postgres (`07:00:00`).
+    static func horario(_ inicio: String, _ fin: String) -> String {
+        "\(inicio.prefix(5))–\(fin.prefix(5))"
+    }
+
     static func diaCorto(_ date: Date) -> String {
         texto(date, formato: "EEE").replacingOccurrences(of: ".", with: "").capitalized
     }
