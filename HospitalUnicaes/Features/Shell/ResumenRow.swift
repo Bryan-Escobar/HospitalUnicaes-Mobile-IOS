@@ -80,9 +80,11 @@ struct SeccionTitulo: View {
 
 /// Fila que abre la información pública del hospital desde Inicio.
 struct InformacionHospitalLink: View {
+    @Environment(\.estadoPublicoService) private var estadoPublico
+
     var body: some View {
         NavigationLink {
-            InformacionPublicaView()
+            InformacionPublicaView(service: estadoPublico)
         } label: {
             HStack(spacing: DSSpacing.medium) {
                 Image(systemName: "building.2")
