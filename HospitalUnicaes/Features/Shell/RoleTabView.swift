@@ -65,7 +65,8 @@ struct PacienteTabView: View {
         _miSalud = State(initialValue: MiSaludViewModel(
             pacienteId: me.pacienteId,
             historial: dependencies.historial,
-            laboratorio: dependencies.laboratorio
+            laboratorio: dependencies.laboratorio,
+            hospitalizaciones: dependencies.hospitalizaciones
         ))
         _laboratorio = State(initialValue: LaboratorioPacienteViewModel(
             service: dependencies.laboratorio,

@@ -1,7 +1,7 @@
 import Foundation
 
 // Modelos de la app del paciente. `PacienteMuestra` arma con fechas relativas a hoy los datos
-// del Figma que todavía no vienen de la API (habitación hasta HUNI-94) y los de los Previews.
+// del Figma para los Previews.
 
 struct CitaPaciente: Hashable, Identifiable {
     var id = UUID()
@@ -78,13 +78,14 @@ struct HabitacionPaciente: Hashable {
     let planta: String
     let ingreso: Date
     let medicoTratante: String
-    /// "HAB-202 · Cama B" si hubo un traslado reciente.
+    /// "HAB-202 · Cama B" si lo trasladaron durante esta hospitalización (cama del último traslado).
     let trasladoDesde: String?
 }
 
 extension HabitacionPaciente {
     /// Hospitalización activa de la API en el formato de las pantallas del paciente.
-    init(_ hospitalizacion: Hospitalizacion) {
+    /// `trasladoDesde` sale de los movimientos del detalle; sin detalle queda en `nil`.
+    init(_ hospitalizacion: Hospitalizacion, trasladoDesde: CamaCodigo? = nil) {
         let habitacion = hospitalizacion.cama.habitacion
         self.init(
             codigo: habitacion.codigo,
@@ -93,8 +94,12 @@ extension HabitacionPaciente {
             planta: "\(habitacion.planta).ª planta",
             ingreso: hospitalizacion.fechaIngreso,
             medicoTratante: hospitalizacion.doctorTratante.nombreCompleto,
-            trasladoDesde: nil
+            trasladoDesde: trasladoDesde?.titulo
         )
+    }
+
+    init(_ detalle: HospitalizacionDetalle) {
+        self.init(detalle.hospitalizacion, trasladoDesde: detalle.ultimoTrasladoDesde)
     }
 }
 
@@ -199,18 +204,6 @@ enum PacienteMuestra {
                     tieneArchivo: false, fechaResultado: completado ?? fecha
                 )
             }
-        )
-    }
-
-    static func habitacion(hoy: Date) -> HabitacionPaciente {
-        HabitacionPaciente(
-            codigo: "HAB-204",
-            cama: "Cama A",
-            tipo: .semiprivada,
-            planta: "2.ª planta",
-            ingreso: Formatting.fecha(Formatting.sumarDias(-2, a: hoy), hora: 16, minuto: 40),
-            medicoTratante: "Dr. Carlos Molina",
-            trasladoDesde: "HAB-202 · Cama B"
         )
     }
 }
