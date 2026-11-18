@@ -3,6 +3,7 @@ import SwiftUI
 /// iOS-C2 Login (Figma 44:775, alta fidelidad).
 struct LoginView: View {
     @State var viewModel: LoginViewModel
+    @Environment(\.estadoPublicoService) private var estadoPublico
     @FocusState private var focusedField: Field?
 
     private enum Field {
@@ -29,7 +30,8 @@ struct LoginView: View {
             .background(DSColor.background)
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: LoginDestination.self) { _ in
-                InformacionPublicaView()
+                // Pública: se abre sin sesión y la API no pide token (HUNI-76).
+                InformacionPublicaView(service: estadoPublico)
             }
         }
         .sheet(isPresented: $viewModel.isShowingRegistro) {

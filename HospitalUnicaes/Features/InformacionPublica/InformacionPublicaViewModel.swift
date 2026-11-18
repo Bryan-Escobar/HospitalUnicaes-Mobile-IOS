@@ -1,31 +1,89 @@
 import Foundation
 import Observation
 
-/// iOS-C5 Información pública: solo agregados, sin datos de pacientes (`context.md` §3.4).
-/// Datos de ejemplo hasta que HUNI-76 conecte los endpoints públicos.
+/// iOS-C5 Información pública (HUNI-76): ocupación agregada, médicos de turno ahora y avisos vigentes de
+/// `GET /api/publico/estado`. Se abre sin sesión desde el login y con sesión desde Inicio. Solo muestra
+/// cantidades y datos del turno, nunca pacientes ni datos personales del personal (`context.md` §3.4).
+///
+/// Una recarga que falla conserva lo ya cargado y muestra el error en un aviso.
 @MainActor
 @Observable
 final class InformacionPublicaViewModel {
-    let ocupacion: [OcupacionPlanta]
-    let medicosDeTurno: [MedicoDeTurno]
-    let avisos: [Aviso]
+    static let mensajeError = "No se pudo cargar la información del hospital."
 
-    init(
-        ocupacion: [OcupacionPlanta] = [
-            OcupacionPlanta(titulo: "VIP · 3.ª planta", ocupadas: 3, total: 5, unidad: "ocupadas"),
-            OcupacionPlanta(titulo: "Semiprivadas · 2.ª planta", ocupadas: 9, total: 12, unidad: "camas"),
-        ],
-        medicosDeTurno: [MedicoDeTurno] = [
-            MedicoDeTurno(nombre: "Dr. Carlos Molina", especialidad: "General", horario: "07:00–15:00"),
-            MedicoDeTurno(nombre: "Dra. Ana Rivas", especialidad: "Alergista", horario: "08:00–14:00"),
-            MedicoDeTurno(nombre: "Dr. Jorge Peña", especialidad: "Emergencia", horario: "06:00–18:00"),
-        ],
-        avisos: [Aviso] = [
-            Aviso(titulo: "Horario de visitas", detalle: "2:00–6:00 p. m. desde el lunes."),
+    private(set) var ocupacion: [OcupacionPlanta] = []
+    private(set) var ocupacionTotal: OcupacionPlanta?
+    private(set) var medicosDeTurno: [MedicoDeTurno] = []
+    private(set) var avisos: [Aviso] = []
+    private(set) var actualizadoEn: Date?
+    private(set) var cargado = false
+    private(set) var isLoading = false
+    private(set) var errorMessage: String?
+
+    private let service: any EstadoPublicoService
+    private var carga = UUID()
+
+    init(service: any EstadoPublicoService) {
+        self.service = service
+    }
+
+    /// "Actualizado a las 10:32".
+    var actualizado: String? {
+        actualizadoEn.map { "Actualizado a las \(Formatting.hora($0))" }
+    }
+
+    /// Error a pantalla completa: nunca se cargó nada.
+    var errorSinDatos: String? { cargado ? nil : errorMessage }
+
+    /// Error de una recarga: se muestra en un aviso sobre los datos anteriores.
+    var errorRecarga: String? { cargado ? errorMessage : nil }
+
+    var sinMedicos: Bool { cargado && medicosDeTurno.isEmpty }
+    var sinAvisos: Bool { cargado && avisos.isEmpty }
+
+    func cargar() async {
+        let token = UUID()
+        carga = token
+        if !cargado { isLoading = true }
+        errorMessage = nil
+        do {
+            let estado = try await service.estado()
+            guard carga == token else { return }
+            aplicar(estado)
+            cargado = true
+            isLoading = false
+        } catch {
+            guard carga == token else { return }
+            errorMessage = Self.mensaje(para: error)
+            isLoading = false
+        }
+    }
+
+    private func aplicar(_ estado: EstadoPublico) {
+        ocupacion = [
+            Self.planta("VIP · 3.ª planta", estado.ocupacion.vip),
+            Self.planta("Semiprivadas · 2.ª planta", estado.ocupacion.semiprivada),
         ]
-    ) {
-        self.ocupacion = ocupacion
-        self.medicosDeTurno = medicosDeTurno
-        self.avisos = avisos
+        ocupacionTotal = Self.planta("Total del hospital", estado.ocupacion.total)
+        medicosDeTurno = estado.medicosDeTurno.map { medico in
+            MedicoDeTurno(
+                nombre: "\(medico.nombres) \(medico.apellidos)",
+                especialidad: medico.especialidad?.nilIfBlank ?? medico.tipo,
+                area: medico.area,
+                horario: Formatting.horario(medico.horaInicio, medico.horaFin)
+            )
+        }
+        avisos = estado.avisos.map { Aviso(titulo: $0.titulo, detalle: $0.contenido) }
+        actualizadoEn = estado.actualizadoEn
+    }
+
+    private static func planta(_ titulo: String, _ conteo: EstadoPublico.Conteo) -> OcupacionPlanta {
+        OcupacionPlanta(titulo: titulo, ocupadas: conteo.ocupadas, disponibles: conteo.disponibles, total: conteo.total)
+    }
+
+    /// Sin sesión no hay "sesión expirada": un 401/403 solo puede ser del servidor.
+    private static func mensaje(para error: Error) -> String {
+        if let error = error as? URLError { return UserFacingError.message(for: error) }
+        return mensajeError
     }
 }

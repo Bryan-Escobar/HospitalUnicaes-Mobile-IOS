@@ -5,6 +5,7 @@ struct HospitalUnicaesApp: App {
     @State private var session: SessionViewModel
     @State private var doctorDependencies: DoctorDependencies
     @State private var pacienteDependencies: PacienteDependencies
+    private let estadoPublico: any EstadoPublicoService
 
     init() {
         #if DEBUG
@@ -15,6 +16,7 @@ struct HospitalUnicaesApp: App {
             _session = State(initialValue: .preview(state))
             _doctorDependencies = State(initialValue: .preview)
             _pacienteDependencies = State(initialValue: .preview)
+            estadoPublico = PreviewEstadoPublicoService()
             return
         }
         #endif
@@ -25,6 +27,7 @@ struct HospitalUnicaesApp: App {
         _session = State(initialValue: SessionViewModel(authService: authService, meService: meService))
         _doctorDependencies = State(initialValue: .live(supabase: supabase, api: apiClient))
         _pacienteDependencies = State(initialValue: .live(supabase: supabase, api: apiClient))
+        estadoPublico = APIEstadoPublicoService(client: apiClient)
     }
 
     var body: some Scene {
@@ -33,6 +36,7 @@ struct HospitalUnicaesApp: App {
                 .environment(session)
                 .environment(\.doctorDependencies, doctorDependencies)
                 .environment(\.pacienteDependencies, pacienteDependencies)
+                .environment(\.estadoPublicoService, estadoPublico)
         }
     }
 }

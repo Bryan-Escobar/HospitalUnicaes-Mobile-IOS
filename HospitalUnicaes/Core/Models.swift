@@ -58,6 +58,7 @@ struct Me: Codable, Equatable, Identifiable {
     let pacienteId: UUID?
     /// Solo para personal del hospital.
     let personal: PersonalResumen?
+    var ultimaConexionAppAt: Date?
 
     var nombreCompleto: String {
         [nombres, apellidos]

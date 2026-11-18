@@ -5,6 +5,7 @@ struct PacienteInicioView: View {
     @State private var viewModel: PacienteInicioViewModel
     @Environment(\.scenePhase) private var scenePhase
     private let onAbrir: (PacienteTab, MiSaludSegmento?) -> Void
+    private let turnosPersonal: any TurnosDelPersonalService
 
     init(
         me: Me,
@@ -22,6 +23,7 @@ struct PacienteInicioView: View {
             hoy: hoy
         ))
         self.onAbrir = onAbrir
+        turnosPersonal = dependencies.turnosPersonal
     }
 
     var body: some View {
@@ -34,6 +36,7 @@ struct PacienteInicioView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                     contenido
                     InformacionHospitalLink()
+                    TurnosDelPersonalLink(service: turnosPersonal)
                 }
                 .pantallaPrincipal()
             }

@@ -19,6 +19,7 @@ extension PacienteDependencies {
             ambulanciaRealtime: PreviewAmbulanciaRealtime(),
             hospitalizaciones: PreviewPacienteHospitalizacionesService(),
             avisos: PreviewAvisosService(),
+            turnosPersonal: PreviewTurnosDelPersonalService(),
             ubicacion: { PreviewUbicacionService() }
         )
     }
@@ -305,6 +306,82 @@ final class PreviewUbicacionService: UbicacionService {
 
     func ubicacionActual() async throws -> Ubicacion {
         Ubicacion(latitud: 13.6929, longitud: -89.2182, precisionM: 20, direccion: "Col. Escalón, San Salvador")
+    }
+}
+
+/// Estado público de ejemplo: ocupación del Figma, tres médicos de turno y un aviso.
+struct PreviewEstadoPublicoService: EstadoPublicoService {
+    func estado() async throws -> EstadoPublico {
+        EstadoPublico(
+            ocupacion: .init(
+                vip: .init(ocupadas: 3, disponibles: 2, total: 5),
+                semiprivada: .init(ocupadas: 9, disponibles: 3, total: 12),
+                total: .init(ocupadas: 12, disponibles: 5, total: 17)
+            ),
+            medicosDeTurno: [
+                .init(nombres: "Carlos", apellidos: "Molina", tipo: "Doctor", especialidad: "Medicina general",
+                      area: "Consulta externa", horaInicio: "07:00:00", horaFin: "15:00:00"),
+                .init(nombres: "Ana", apellidos: "Rivas", tipo: "Doctor", especialidad: "Alergología",
+                      area: "Consulta externa", horaInicio: "08:00:00", horaFin: "14:00:00"),
+                .init(nombres: "Jorge", apellidos: "Peña", tipo: "Médico de emergencia", especialidad: nil,
+                      area: "Emergencia", horaInicio: "06:00:00", horaFin: "18:00:00"),
+            ],
+            avisos: [
+                .init(id: UUID(), titulo: "Horario de visitas", contenido: "2:00–6:00 p. m. desde el lunes.",
+                      fechaPublicacion: Date(), fechaExpiracion: nil),
+            ],
+            actualizadoEn: Date()
+        )
+    }
+}
+
+/// Turnos de ejemplo para cualquier día: mañana, tarde y noche en tres áreas.
+struct PreviewTurnosDelPersonalService: TurnosDelPersonalService {
+    private struct Plantilla {
+        let desde: Int
+        let hasta: Int
+        let nombres: String
+        let apellidos: String
+        let tipo: String
+        let especialidad: String?
+        let area: String
+    }
+
+    private static let plantillas = [
+        Plantilla(desde: 7, hasta: 15, nombres: "Carlos", apellidos: "Molina", tipo: "Doctor",
+                  especialidad: "Medicina general", area: "Consulta externa"),
+        Plantilla(desde: 8, hasta: 14, nombres: "Ana", apellidos: "Rivas", tipo: "Doctor",
+                  especialidad: "Alergología", area: "Consulta externa"),
+        Plantilla(desde: 7, hasta: 15, nombres: "María", apellidos: "López", tipo: "Enfermero/a",
+                  especialidad: nil, area: "Hospitalización"),
+        Plantilla(desde: 15, hasta: 23, nombres: "Rosa", apellidos: "Hernández", tipo: "Enfermero/a",
+                  especialidad: nil, area: "Hospitalización"),
+        Plantilla(desde: 19, hasta: 7, nombres: "Jorge", apellidos: "Peña", tipo: "Médico de emergencia",
+                  especialidad: nil, area: "Emergencia"),
+    ]
+
+    func turnos(desde: Date, hasta: Date) async throws -> [TurnoDelPersonal] {
+        var turnos: [TurnoDelPersonal] = []
+        var dia = Formatting.startOfDay(desde)
+        while dia <= hasta {
+            turnos += Self.plantillas.map { Self.turno($0, dia: dia) }
+            dia = Formatting.sumarDias(1, a: dia)
+        }
+        return turnos
+    }
+
+    private static func turno(_ plantilla: Plantilla, dia: Date) -> TurnoDelPersonal {
+        let nocturno = plantilla.hasta < plantilla.desde
+        let tipoTurno = nocturno ? "noche" : (plantilla.desde < 12 ? "manana" : "tarde")
+        return TurnoDelPersonal(
+            id: UUID(), nombres: plantilla.nombres, apellidos: plantilla.apellidos, tipoPersonal: plantilla.tipo,
+            especialidad: plantilla.especialidad, area: plantilla.area, tipoTurno: tipoTurno,
+            fecha: Formatting.diaISO(dia),
+            horaInicio: String(format: "%02d:00:00", plantilla.desde),
+            horaFin: String(format: "%02d:00:00", plantilla.hasta),
+            inicio: Formatting.fecha(dia, hora: plantilla.desde),
+            fin: Formatting.fecha(nocturno ? Formatting.sumarDias(1, a: dia) : dia, hora: plantilla.hasta)
+        )
     }
 }
 #endif

@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import OSLog
 
 /// Estado global de autenticación compartido por toda la app.
 @MainActor
@@ -18,10 +19,23 @@ final class SessionViewModel {
     }
 
     private(set) var state: State = .loading
+    private(set) var errorConexionApp: String?
+
+    var perfilActivoID: UUID? { perfilAutenticado?.id }
+
+    var ultimaConexionAppAt: Date? { perfilAutenticado?.ultimaConexionAppAt }
+
+    private var perfilAutenticado: Me? {
+        switch state {
+        case .signedIn(let me), .accesoNoDisponible(let me): me
+        case .loading, .signedOut, .sessionExpired: nil
+        }
+    }
 
     private let authService: AuthService
     private let meService: MeService
     private var eventsTask: Task<Void, Never>?
+    private let conexionLogger = Logger(subsystem: "HospitalUnicaes", category: "ConexionApp")
 
     init(authService: AuthService, meService: MeService, state: State = .loading) {
         self.authService = authService
@@ -70,6 +84,59 @@ final class SessionViewModel {
         try await authService.resetPassword(email: email)
     }
 
+    /// SwiftUI cancela esta tarea al dejar de estar activa la app o al cambiar de perfil.
+    /// El personal que mantiene la app abierta puede registrar asistencia al comenzar un turno.
+    func mantenerConexionApp(
+        perfilID: UUID,
+        esperar: @MainActor (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
+    ) async {
+        while !Task.isCancelled, perfilActivoID == perfilID {
+            await registrarConexionApp(perfilID: perfilID)
+            guard perfilActivoID == perfilID else { return }
+
+            let intervalo: Duration
+            if errorConexionApp != nil {
+                intervalo = .seconds(15)
+            } else if perfilAutenticado?.personal != nil {
+                intervalo = .seconds(60)
+            } else {
+                return
+            }
+            do {
+                try await esperar(intervalo)
+            } catch {
+                return
+            }
+        }
+    }
+
+    func registrarConexionApp(perfilID: UUID) async {
+        guard !Task.isCancelled, perfilActivoID == perfilID else { return }
+        do {
+            let fecha = try await meService.registrarConexionApp()
+            guard !Task.isCancelled, var me = perfilAutenticado, me.id == perfilID else { return }
+            me.ultimaConexionAppAt = fecha
+            state = me.rol.usesIOSApp ? .signedIn(me) : .accesoNoDisponible(me)
+            errorConexionApp = nil
+        } catch {
+            guard !Task.isCancelled, perfilActivoID == perfilID else { return }
+            if let respuesta = error as? APIError {
+                if errorConexionApp == nil {
+                    conexionLogger.warning("El registro de conexión respondió HTTP \(respuesta.statusCode, privacy: .public).")
+                }
+                errorConexionApp = respuesta.statusCode == 404
+                    ? "La API configurada todavía no tiene habilitado el registro de conexión."
+                    : "No se pudo registrar la conexión."
+            } else {
+                if errorConexionApp == nil {
+                    let tipo = String(describing: type(of: error))
+                    conexionLogger.warning("Falló el registro de conexión: \(tipo, privacy: .public).")
+                }
+                errorConexionApp = "No se pudo registrar la conexión."
+            }
+        }
+    }
+
     func signOut() async {
         await discardSession()
         state = .signedOut
@@ -84,6 +151,7 @@ final class SessionViewModel {
 
     private func loadMe() async throws {
         let me = try await meService.fetchMe()
+        errorConexionApp = nil
         state = me.rol.usesIOSApp ? .signedIn(me) : .accesoNoDisponible(me)
     }
 

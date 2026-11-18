@@ -14,8 +14,8 @@ struct PerfilViewModelTests {
 
         #expect(viewModel.nombre == "Ana Rivas")
         #expect(viewModel.rolYTipo == "Doctor · Alergista")
-        #expect(viewModel.rows.map(\.label) == ["Correo", "Teléfono", "Rol y tipo"])
-        #expect(viewModel.rows.map(\.value) == ["doctor@demo.test", "—", "Doctor · Alergista"])
+        #expect(viewModel.rows().map(\.label) == ["Correo", "Teléfono", "Rol y tipo", "Última conexión"])
+        #expect(viewModel.rows().map(\.value) == ["doctor@demo.test", "—", "Doctor · Alergista", "—"])
     }
 
     @Test func pacienteSinTelefonoMuestraGuion() {
@@ -34,7 +34,19 @@ struct PerfilViewModelTests {
         )
         let viewModel = PerfilViewModel(me: perfil, health: health)
 
-        #expect(viewModel.rows.map(\.value) == ["—", "—", "Paciente"])
+        #expect(viewModel.rows().map(\.value) == ["—", "—", "Paciente", "—"])
+    }
+
+    @Test func ultimaConexionMuestraLaFechaReportadaPorLaSesion() {
+        var perfil = Me.fixture(rol: .doctor)
+        perfil.ultimaConexionAppAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let fecha = Date(timeIntervalSince1970: 1_800_000_000)
+        let viewModel = PerfilViewModel(me: perfil, health: health)
+
+        let fila = viewModel.rows(ultimaConexionAppAt: fecha).last
+
+        #expect(fila?.label == "Última conexión")
+        #expect(fila?.value == fecha.formatted(date: .abbreviated, time: .shortened))
     }
 
     @Test func cerrarSesionVuelveALogin() async {
