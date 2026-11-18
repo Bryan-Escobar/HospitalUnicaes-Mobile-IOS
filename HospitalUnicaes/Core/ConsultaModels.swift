@@ -139,3 +139,63 @@ struct Hospitalizacion: Decodable, Hashable, Identifiable {
         return "\(cama.habitacion.tipo.nombre) · \(planta) planta · desde \(desde)"
     }
 }
+
+/// Cama de un movimiento: la API solo trae id y código (`HAB-202-B`).
+struct CamaCodigo: Decodable, Hashable {
+    let id: UUID
+    let codigo: String
+
+    /// `HAB-202-B` → `HAB-202 · Cama B`. Si el código no termina en `-<letra>`, lo devuelve tal cual.
+    var titulo: String {
+        guard let guion = codigo.lastIndex(of: "-") else { return codigo }
+        let letra = codigo[codigo.index(after: guion)...]
+        guard letra.count == 1, letra.first?.isLetter == true else { return codigo }
+        return "\(codigo[..<guion]) · Cama \(letra)"
+    }
+}
+
+enum TipoMovimientoCama: String, Hashable, Decodable {
+    case ingreso, traslado, alta, desconocido
+
+    init(from decoder: Decoder) throws {
+        self = try EnumDecoding.value(TipoMovimientoCama.self, from: decoder, fallback: .desconocido)
+    }
+}
+
+/// Ingreso, traslado o alta de una hospitalización (`movimientos` del detalle).
+struct MovimientoCama: Decodable, Hashable {
+    let tipo: TipoMovimientoCama
+    /// `nil` en el ingreso.
+    let camaOrigen: CamaCodigo?
+    /// `nil` en el alta.
+    let camaDestino: CamaCodigo?
+    let createdAt: Date
+}
+
+/// `GET /hospitalizaciones/{id}`: la hospitalización con su historial de movimientos.
+struct HospitalizacionDetalle: Decodable, Hashable {
+    let hospitalizacion: Hospitalizacion
+    let movimientos: [MovimientoCama]
+
+    init(hospitalizacion: Hospitalizacion, movimientos: [MovimientoCama]) {
+        self.hospitalizacion = hospitalizacion
+        self.movimientos = movimientos
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case movimientos
+    }
+
+    init(from decoder: Decoder) throws {
+        hospitalizacion = try Hospitalizacion(from: decoder)
+        movimientos = try decoder.container(keyedBy: CodingKeys.self).decode([MovimientoCama].self, forKey: .movimientos)
+    }
+
+    /// Cama anterior del último traslado, o `nil` si nunca lo trasladaron.
+    var ultimoTrasladoDesde: CamaCodigo? {
+        movimientos
+            .filter { $0.tipo == .traslado }
+            .max { $0.createdAt < $1.createdAt }?
+            .camaOrigen
+    }
+}
