@@ -18,6 +18,17 @@ final class SessionViewModel {
     }
 
     private(set) var state: State = .loading
+    private(set) var errorConexionApp = false
+
+    var perfilActivoID: UUID? {
+        guard case .signedIn(let me) = state else { return nil }
+        return me.id
+    }
+
+    var ultimaConexionAppAt: Date? {
+        guard case .signedIn(let me) = state else { return nil }
+        return me.ultimaConexionAppAt
+    }
 
     private let authService: AuthService
     private let meService: MeService
@@ -70,6 +81,20 @@ final class SessionViewModel {
         try await authService.resetPassword(email: email)
     }
 
+    func registrarConexionApp(perfilID: UUID) async {
+        guard !Task.isCancelled, perfilActivoID == perfilID else { return }
+        do {
+            let fecha = try await meService.registrarConexionApp()
+            guard !Task.isCancelled, case .signedIn(var me) = state, me.id == perfilID else { return }
+            me.ultimaConexionAppAt = fecha
+            state = .signedIn(me)
+            errorConexionApp = false
+        } catch {
+            guard !Task.isCancelled, perfilActivoID == perfilID else { return }
+            errorConexionApp = true
+        }
+    }
+
     func signOut() async {
         await discardSession()
         state = .signedOut
@@ -84,6 +109,7 @@ final class SessionViewModel {
 
     private func loadMe() async throws {
         let me = try await meService.fetchMe()
+        errorConexionApp = false
         state = me.rol.usesIOSApp ? .signedIn(me) : .accesoNoDisponible(me)
     }
 

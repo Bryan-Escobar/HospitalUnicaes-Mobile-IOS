@@ -23,6 +23,23 @@ struct APIClientNetworkingTests {
         #expect(me.avatarUrl == nil)
         #expect(me.rol == .doctor)
         #expect(me.personal?.codigoEmpleado == "EMP-1")
+        #expect(me.ultimaConexionAppAt == nil)
+    }
+
+    @Test func registrarConexionUsaBearerYDevuelveElInstanteGuardado() async throws {
+        let session = MockURLProtocol.session { _ in
+            (200, Data(#"{"data":{"ultima_conexion_app_at":"1970-01-01T00:00:00.125Z"}}"#.utf8))
+        }
+        let client = APIClient(baseURL: base, session: session) { "jwt-supabase" }
+
+        let fecha = try await APIMeService(client: client).registrarConexionApp()
+        let request = try #require(MockURLProtocol.requests(of: session).first)
+
+        #expect(request.httpMethod == "POST")
+        #expect(request.url?.path == "/api/auth/me/conexion-app")
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer jwt-supabase")
+        #expect(request.httpBody == nil)
+        #expect(fecha == Date(timeIntervalSince1970: 0.125))
     }
 
     @Test func codificaElBodyEnSnakeCase() async throws {

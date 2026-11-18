@@ -49,6 +49,36 @@ struct SessionViewModelTests {
         #expect(session.state == .sessionExpired)
     }
 
+    @Test func registrarConexionActualizaElPerfilActivo() async throws {
+        let session = makeSession()
+        try await session.signIn(email: "doctor@demo.test", password: "x")
+        let perfilID = try #require(session.perfilActivoID)
+        let fecha = Date(timeIntervalSince1970: 1_800_000_000)
+        me.conexionResult = .success(fecha)
+
+        await session.registrarConexionApp(perfilID: perfilID)
+
+        #expect(me.conexionCount == 1)
+        #expect(session.ultimaConexionAppAt == fecha)
+        #expect(!session.errorConexionApp)
+    }
+
+    @Test func unFalloDeConexionConservaElPerfilYSuUltimaConexion() async throws {
+        var perfil = Me.fixture(rol: .doctor)
+        let fechaAnterior = Date(timeIntervalSince1970: 1_700_000_000)
+        perfil.ultimaConexionAppAt = fechaAnterior
+        me.meResult = .success(perfil)
+        me.conexionResult = .failure(URLError(.notConnectedToInternet))
+        let session = makeSession()
+        try await session.signIn(email: "doctor@demo.test", password: "x")
+
+        await session.registrarConexionApp(perfilID: perfil.id)
+
+        #expect(session.state == .signedIn(perfil))
+        #expect(session.ultimaConexionAppAt == fechaAnterior)
+        #expect(session.errorConexionApp)
+    }
+
     @Test func meCon401LimpiaLaSesion() async {
         auth.storedUser = AppUser(id: UUID(), email: "x@demo.test")
         me.meResult = .failure(APIError(statusCode: 401, code: "NO_AUTENTICADO"))

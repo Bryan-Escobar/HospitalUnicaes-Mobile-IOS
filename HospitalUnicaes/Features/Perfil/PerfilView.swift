@@ -12,6 +12,12 @@ struct PerfilView: View {
                 VStack(spacing: DSSpacing.medium) {
                     header
                     datos
+                    if session.errorConexionApp {
+                        Text("No se pudo registrar la conexión.")
+                            .font(DSFont.bodySecondary)
+                            .foregroundStyle(DSColor.textSecondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                     servidor
                     ajustes
                     DSButton(
@@ -68,8 +74,9 @@ struct PerfilView: View {
     }
 
     private var datos: some View {
-        VStack(spacing: 0) {
-            ForEach(Array(viewModel.rows.enumerated()), id: \.element.id) { index, row in
+        let rows = viewModel.rows(ultimaConexionAppAt: session.ultimaConexionAppAt)
+        return VStack(spacing: 0) {
+            ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
                 ViewThatFits(in: .horizontal) {
                     HStack(alignment: .firstTextBaseline, spacing: DSSpacing.medium) {
                         rowLabel(row)
@@ -84,7 +91,7 @@ struct PerfilView: View {
                 }
                 .padding(.vertical, 9)
                 .overlay(alignment: .bottom) {
-                    if index < viewModel.rows.count - 1 { separator }
+                    if index < rows.count - 1 { separator }
                 }
                 .accessibilityElement(children: .combine)
             }
