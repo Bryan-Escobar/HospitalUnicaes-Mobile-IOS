@@ -24,6 +24,24 @@ struct DoctorModelsTests {
         #expect(hospitalizacion.cama.habitacion.tipo == .semiprivada)
     }
 
+    @Test func detalleDeHospitalizacionConTrasladoYMovimientoDesconocido() throws {
+        let detalle = try APIClient.decoder.decode(HospitalizacionDetalle.self, from: Data(hospitalizacionDetalleJSON.utf8))
+
+        #expect(detalle.hospitalizacion.tituloCama == "HAB-204 · Cama A")
+        #expect(detalle.hospitalizacion.doctorTratante.nombres == "Ana")
+        #expect(detalle.movimientos.map(\.tipo) == [.ingreso, .traslado, .traslado, .desconocido])
+        #expect(detalle.movimientos[0].camaOrigen == nil)
+        #expect(detalle.ultimoTrasladoDesde?.codigo == "HAB-203-B")
+        #expect(detalle.ultimoTrasladoDesde?.titulo == "HAB-203 · Cama B")
+    }
+
+    @Test func tituloDeCama() {
+        #expect(CamaCodigo(id: UUID(), codigo: "VIP-301-A").titulo == "VIP-301 · Cama A")
+        #expect(CamaCodigo(id: UUID(), codigo: "VIP-301").titulo == "VIP-301")
+        #expect(CamaCodigo(id: UUID(), codigo: "HAB-").titulo == "HAB-")
+        #expect(CamaCodigo(id: UUID(), codigo: "CAMA").titulo == "CAMA")
+    }
+
     @Test func citaDeLaVistaYEstadoDesconocido() throws {
         let cita = try SupabaseClientFactory.postgrestDecoder.decode(Cita.self, from: Data(citaJSON.utf8))
         #expect(cita.pacienteNombre == "Luis Martínez")
@@ -92,6 +110,28 @@ private let hospitalizacionJSON = """
   "fecha_alta": null, "motivo_ingreso": "Observación", "estado": "activa"
 }
 """
+
+/// Traslados fuera de orden: el último por fecha es desde HAB-203-B.
+private let hospitalizacionDetalleJSON: String = {
+    let base = hospitalizacionJSON.trimmingCharacters(in: .whitespacesAndNewlines).dropLast()
+    return base + """
+      ,
+      "movimientos": [
+        { "tipo": "ingreso", "cama_origen": null, "cama_destino": { "id": "55555555-5555-4555-8555-000000000002", "codigo": "HAB-202-B" },
+          "registrado_por": null, "notas": null, "created_at": "2026-10-19T14:00:00Z" },
+        { "tipo": "traslado", "cama_origen": { "id": "55555555-5555-4555-8555-000000000003", "codigo": "HAB-203-B" },
+          "cama_destino": { "id": "55555555-5555-4555-8555-000000000001", "codigo": "HAB-204-A" },
+          "registrado_por": { "id": "33333333-3333-4333-8333-000000000009", "nombres": "Rosa", "apellidos": "López" },
+          "notas": "Cambio por aislamiento", "created_at": "2026-10-21T09:00:00.000Z" },
+        { "tipo": "traslado", "cama_origen": { "id": "55555555-5555-4555-8555-000000000002", "codigo": "HAB-202-B" },
+          "cama_destino": { "id": "55555555-5555-4555-8555-000000000003", "codigo": "HAB-203-B" },
+          "registrado_por": null, "notas": null, "created_at": "2026-10-20T09:00:00Z" },
+        { "tipo": "reasignacion", "cama_origen": null, "cama_destino": null,
+          "registrado_por": null, "notas": null, "created_at": "2026-10-21T10:00:00Z" }
+      ]
+    }
+    """
+}()
 
 private func historialJSON(fraccion: Bool) -> String {
     let fecha = fraccion ? "2026-10-14T15:00:00.000Z" : "2026-10-14T15:00:00Z"

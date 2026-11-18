@@ -2,16 +2,19 @@ import Foundation
 import Testing
 @testable import HospitalUnicaes
 
-/// Historial clínico propio en Mi salud (HUNI-60).
+/// Historial clínico propio (HUNI-60) y habitación asignada (HUNI-94) en Mi salud.
 @MainActor
 struct MiSaludViewModelTests {
     private let historial = FakeHistorialPacienteService()
     private let laboratorio = FakeLaboratorioPacienteService()
+    private let hospitalizaciones = FakeHospitalizacionesService()
     private let reciente = Date(timeIntervalSince1970: 1_792_598_400)
     private let antigua = Date(timeIntervalSince1970: 1_788_000_000)
 
     private func viewModel(pacienteId: UUID? = HistorialFixtures.pacienteId) -> MiSaludViewModel {
-        MiSaludViewModel(pacienteId: pacienteId, historial: historial, laboratorio: laboratorio)
+        MiSaludViewModel(
+            pacienteId: pacienteId, historial: historial, laboratorio: laboratorio, hospitalizaciones: hospitalizaciones
+        )
     }
 
     @Test func empiezaEnHistorialCargando() {
@@ -164,8 +167,10 @@ struct MiSaludViewModelTests {
         await viewModel.recargar()
 
         #expect(viewModel.estado == .error("Tu cuenta todavía no tiene un expediente clínico."))
+        #expect(viewModel.estadoHabitacion == .error("Tu cuenta todavía no tiene un expediente clínico."))
         #expect(historial.pacienteIds.isEmpty)
         #expect(laboratorio.llamadasOrdenes == 0)
+        #expect(hospitalizaciones.pacienteIds.isEmpty)
     }
 
     @Test func cargarSiHaceFaltaSoloCargaUnaVez() async {
@@ -179,7 +184,123 @@ struct MiSaludViewModelTests {
         #expect(historial.pacienteIds.count == 2)
     }
 
-    @Test func laHabitacionSigueSiendoDeEjemploHastaHUNI94() {
-        #expect(viewModel().habitacion?.codigo == "HAB-204")
+    // MARK: Habitación asignada (HUNI-94)
+
+    @Test func cargaLaHabitacionYLaCamaAsignadas() async {
+        let hospitalizacion = DoctorFixtures.hospitalizacion()
+        hospitalizaciones.result = .success(hospitalizacion)
+        let viewModel = viewModel()
+
+        await viewModel.recargar()
+
+        #expect(hospitalizaciones.pacienteIds == [HistorialFixtures.pacienteId])
+        #expect(hospitalizaciones.detalleIds == [hospitalizacion.id])
+        #expect(viewModel.estadoHabitacion == .listo)
+        #expect(viewModel.habitacion?.codigo == "HAB-204")
+        #expect(viewModel.habitacion?.cama == "Cama A")
+        #expect(viewModel.habitacion?.tipo == .semiprivada)
+        #expect(viewModel.habitacion?.planta == "2.ª planta")
+        #expect(viewModel.habitacion?.medicoTratante == "Ana Rivas")
+        #expect(viewModel.habitacion?.trasladoDesde == nil)
+    }
+
+    @Test func muestraLaCamaAnteriorDelUltimoTraslado() async {
+        hospitalizaciones.result = .success(DoctorFixtures.hospitalizacion())
+        let ingreso = Date(timeIntervalSince1970: 1_792_000_000)
+        hospitalizaciones.movimientosResult = .success([
+            movimiento(.ingreso, desde: nil, hacia: "HAB-201-A", en: ingreso),
+            movimiento(.traslado, desde: "HAB-202-B", hacia: "HAB-204-A", en: ingreso.addingTimeInterval(7_200)),
+            movimiento(.traslado, desde: "HAB-201-A", hacia: "HAB-202-B", en: ingreso.addingTimeInterval(3_600)),
+        ])
+        let viewModel = viewModel()
+
+        await viewModel.recargar()
+
+        #expect(viewModel.habitacion?.trasladoDesde == "HAB-202 · Cama B")
+    }
+
+    @Test func sinHospitalizacionActivaQuedaListoYVacio() async {
+        hospitalizaciones.result = .success(nil)
+        let viewModel = viewModel()
+
+        await viewModel.recargar()
+
+        #expect(viewModel.estadoHabitacion == .listo)
+        #expect(viewModel.habitacion == nil)
+        #expect(hospitalizaciones.detalleIds.isEmpty)
+    }
+
+    @Test func siFallaElDetalleMuestraLaHabitacionSinTraslado() async {
+        hospitalizaciones.result = .success(DoctorFixtures.hospitalizacion())
+        hospitalizaciones.movimientosResult = .failure(URLError(.timedOut))
+        let viewModel = viewModel()
+
+        await viewModel.recargar()
+
+        #expect(viewModel.estadoHabitacion == .listo)
+        #expect(viewModel.habitacion?.codigo == "HAB-204")
+        #expect(viewModel.habitacion?.trasladoDesde == nil)
+    }
+
+    @Test func errorDeLaHabitacionNoAfectaAlHistorialYSeReintenta() async {
+        hospitalizaciones.result = .failure(URLError(.notConnectedToInternet))
+        let viewModel = viewModel()
+
+        await viewModel.recargar()
+        #expect(viewModel.estadoHabitacion == .error("No se pudo cargar tu habitación."))
+        #expect(viewModel.habitacion == nil)
+        #expect(viewModel.estado == .listo)
+
+        hospitalizaciones.result = .success(DoctorFixtures.hospitalizacion())
+        await viewModel.recargar()
+        #expect(viewModel.estadoHabitacion == .listo)
+        #expect(viewModel.habitacion?.codigo == "HAB-204")
+    }
+
+    @Test func errorDelHistorialNoAfectaALaHabitacion() async {
+        historial.historialResult = .failure(URLError(.timedOut))
+        hospitalizaciones.result = .success(DoctorFixtures.hospitalizacion())
+        let viewModel = viewModel()
+
+        await viewModel.recargar()
+
+        #expect(viewModel.estado == .error("No se pudo cargar tu historial clínico."))
+        #expect(viewModel.estadoHabitacion == .listo)
+        #expect(viewModel.habitacion?.codigo == "HAB-204")
+    }
+
+    @Test func errorEnUnaRecargaConservaLaHabitacion() async {
+        hospitalizaciones.result = .success(DoctorFixtures.hospitalizacion())
+        let viewModel = viewModel()
+        await viewModel.recargar()
+
+        hospitalizaciones.result = .failure(APIError(statusCode: 500, code: "HTTP_500"))
+        await viewModel.recargar()
+
+        #expect(viewModel.estadoHabitacion == .listo)
+        #expect(viewModel.habitacion?.codigo == "HAB-204")
+    }
+
+    @Test func trasDarDeAltaLaRecargaQuitaLaHabitacion() async {
+        hospitalizaciones.result = .success(DoctorFixtures.hospitalizacion())
+        let viewModel = viewModel()
+        await viewModel.recargar()
+
+        hospitalizaciones.result = .success(nil)
+        await viewModel.recargar()
+
+        #expect(viewModel.estadoHabitacion == .listo)
+        #expect(viewModel.habitacion == nil)
+    }
+
+    private func movimiento(
+        _ tipo: TipoMovimientoCama, desde origen: String?, hacia destino: String?, en fecha: Date
+    ) -> MovimientoCama {
+        MovimientoCama(
+            tipo: tipo,
+            camaOrigen: origen.map { CamaCodigo(id: UUID(), codigo: $0) },
+            camaDestino: destino.map { CamaCodigo(id: UUID(), codigo: $0) },
+            createdAt: fecha
+        )
     }
 }

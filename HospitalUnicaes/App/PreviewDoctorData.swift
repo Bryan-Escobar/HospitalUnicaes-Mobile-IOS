@@ -183,6 +183,11 @@ private struct PreviewHospitalizacionesService: HospitalizacionesService {
             fechaAlta: nil, motivoIngreso: "Observación", estado: .activa
         )
     }
+
+    func detalle(id: UUID) async throws -> HospitalizacionDetalle {
+        guard let hospitalizacion = try await activa(pacienteId: DoctorPreviewData.luis) else { throw CancellationError() }
+        return HospitalizacionDetalle(hospitalizacion: hospitalizacion, movimientos: [])
+    }
 }
 
 struct PreviewConsultasService: ConsultasService {

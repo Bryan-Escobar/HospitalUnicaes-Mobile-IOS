@@ -3,6 +3,8 @@ import Foundation
 protocol HospitalizacionesService: Sendable {
     /// Hospitalización activa del paciente, o `nil`. Lista vacía, 404 (HUNI-66) y 403 no lanzan.
     func activa(pacienteId: UUID) async throws -> Hospitalizacion?
+    /// Detalle con el historial de ingreso, traslados y alta. Un paciente solo puede pedir la suya (403).
+    func detalle(id: UUID) async throws -> HospitalizacionDetalle
 }
 
 struct APIHospitalizacionesService: HospitalizacionesService {
@@ -25,5 +27,9 @@ struct APIHospitalizacionesService: HospitalizacionesService {
         } catch let error as APIError where error.code == "RUTA_NO_ENCONTRADA" || error.code == "ACCESO_DENEGADO" {
             return nil
         }
+    }
+
+    func detalle(id: UUID) async throws -> HospitalizacionDetalle {
+        try await client.send(.get, "hospitalizaciones/\(id.uuidString.lowercased())")
     }
 }

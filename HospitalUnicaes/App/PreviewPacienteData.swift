@@ -256,11 +256,13 @@ struct PreviewAmbulanciaRealtime: AmbulanciaRealtimeService {
     }
 }
 
-/// Hospitalización activa de ejemplo (HAB-204, cama A) como en el Figma.
+/// Hospitalización activa de ejemplo (HAB-204, cama A, trasladado desde HAB-202 cama B) como en el Figma.
 struct PreviewPacienteHospitalizacionesService: HospitalizacionesService {
+    private static let id = UUID(uuidString: "eeeeeeee-eeee-4eee-8eee-000000000001") ?? UUID()
+
     func activa(pacienteId: UUID) async throws -> Hospitalizacion? {
         Hospitalizacion(
-            id: UUID(),
+            id: Self.id,
             paciente: PersonaResumen(id: pacienteId, nombres: "Carlos", apellidos: "Martínez"),
             cama: CamaResumen(
                 id: UUID(), codigo: "HAB-204-A",
@@ -270,6 +272,17 @@ struct PreviewPacienteHospitalizacionesService: HospitalizacionesService {
             fechaIngreso: Formatting.sumarDias(-2, a: Date()),
             fechaAlta: nil, motivoIngreso: nil, estado: .activa
         )
+    }
+
+    func detalle(id: UUID) async throws -> HospitalizacionDetalle {
+        guard let hospitalizacion = try await activa(pacienteId: UUID()) else { throw CancellationError() }
+        let ingreso = hospitalizacion.fechaIngreso
+        let anterior = CamaCodigo(id: UUID(), codigo: "HAB-202-B")
+        let actual = CamaCodigo(id: hospitalizacion.cama.id, codigo: hospitalizacion.cama.codigo)
+        return HospitalizacionDetalle(hospitalizacion: hospitalizacion, movimientos: [
+            MovimientoCama(tipo: .ingreso, camaOrigen: nil, camaDestino: anterior, createdAt: ingreso),
+            MovimientoCama(tipo: .traslado, camaOrigen: anterior, camaDestino: actual, createdAt: ingreso.addingTimeInterval(86_400)),
+        ])
     }
 }
 

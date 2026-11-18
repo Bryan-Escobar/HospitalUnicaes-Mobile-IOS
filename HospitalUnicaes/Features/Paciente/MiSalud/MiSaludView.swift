@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// iOS-P5 / P7 / P9 Mi salud. El historial se carga al abrir la pestaña y con pull-to-refresh;
+/// iOS-P5 / P7 / P9 Mi salud. El historial y la habitación se cargan al abrir la pestaña y con pull-to-refresh;
 /// el laboratorio se escucha en vivo mientras la pestaña está visible y la app activa
 /// (el canal sigue abierto al entrar a iOS-P8).
 struct MiSaludView: View {
@@ -30,9 +30,8 @@ struct MiSaludView: View {
             }
             .refreshable {
                 switch viewModel.segmento {
-                case .historial: await viewModel.recargar()
+                case .historial, .habitacion: await viewModel.recargar()
                 case .laboratorio: await laboratorio.recargar()
-                case .habitacion: break
                 }
             }
             .background(DSColor.backgroundGrouped)
@@ -120,6 +119,25 @@ struct MiSaludView: View {
 
     @ViewBuilder
     private var habitacion: some View {
+        switch viewModel.estadoHabitacion {
+        case .cargando:
+            ProgressView("Cargando tu habitación…")
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, DSSpacing.large)
+        case .error(let mensaje):
+            VStack(spacing: DSSpacing.medium) {
+                DSBanner("\(mensaje) Revisa tu conexión e inténtalo de nuevo.", kind: .error)
+                DSButton("Reintentar", systemImage: "arrow.clockwise", kind: .secondary, size: .compact) {
+                    Task { await viewModel.recargar() }
+                }
+            }
+        case .listo:
+            habitacionAsignada
+        }
+    }
+
+    @ViewBuilder
+    private var habitacionAsignada: some View {
         if let habitacion = viewModel.habitacion {
             HabitacionCard(habitacion: habitacion)
             if let anterior = habitacion.trasladoDesde {
@@ -250,7 +268,8 @@ struct PacienteDestination: View {
         viewModel: MiSaludViewModel(
             pacienteId: UUID(),
             historial: dependencies.historial,
-            laboratorio: dependencies.laboratorio
+            laboratorio: dependencies.laboratorio,
+            hospitalizaciones: dependencies.hospitalizaciones
         ),
         laboratorio: LaboratorioPacienteViewModel(
             service: dependencies.laboratorio,

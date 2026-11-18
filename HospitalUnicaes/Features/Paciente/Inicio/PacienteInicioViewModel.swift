@@ -104,7 +104,7 @@ final class PacienteInicioViewModel {
         }
         switch rHospitalizacion {
         case .success(let valor):
-            habitacion = valor.map(HabitacionPaciente.init)
+            habitacion = valor.map { HabitacionPaciente($0) }
         case .failure:
             fallidas.append("habitación")
         }
