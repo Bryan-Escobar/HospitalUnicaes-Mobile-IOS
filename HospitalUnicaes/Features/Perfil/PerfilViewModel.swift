@@ -34,11 +34,14 @@ final class PerfilViewModel {
     var nombre: String { me.nombreCompleto }
     var rolYTipo: String { me.rolYTipo }
 
-    var rows: [Row] {
-        [
+    func rows(ultimaConexionAppAt: Date? = nil) -> [Row] {
+        let ultimaConexion = (ultimaConexionAppAt ?? me.ultimaConexionAppAt)?
+            .formatted(date: .abbreviated, time: .shortened)
+        return [
             Row(label: "Correo", value: me.email ?? "—"),
             Row(label: "Teléfono", value: me.telefono ?? "—"),
             Row(label: "Rol y tipo", value: me.rolYTipo),
+            Row(label: "Última conexión", value: ultimaConexion ?? "—"),
         ]
     }
 

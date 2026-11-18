@@ -41,12 +41,19 @@ final class FakeAuthService: AuthService, @unchecked Sendable {
 final class FakeMeService: MeService, @unchecked Sendable {
     var meResult: Result<Me, Error> = .success(.fixture(rol: .doctor))
     var registroResult: Result<Me, Error> = .success(.fixture(rol: .paciente))
+    var conexionResult: Result<Date, Error> = .success(Date(timeIntervalSince1970: 0))
     private(set) var fetchCount = 0
+    private(set) var conexionCount = 0
     private(set) var registros: [RegistroPacienteRequest] = []
 
     func fetchMe() async throws -> Me {
         fetchCount += 1
         return try meResult.get()
+    }
+
+    func registrarConexionApp() async throws -> Date {
+        conexionCount += 1
+        return try conexionResult.get()
     }
 
     func registrar(_ request: RegistroPacienteRequest) async throws -> Me {

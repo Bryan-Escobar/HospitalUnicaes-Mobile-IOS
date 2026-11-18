@@ -4,8 +4,10 @@ import SwiftUI
 struct RootView: View {
     @Environment(SessionViewModel.self) private var session
     @Environment(\.pacienteDependencies) private var pacienteDependencies
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
+        let perfilActivo = scenePhase == .active ? session.perfilActivoID : nil
         Group {
             switch session.state {
             case .loading:
@@ -26,6 +28,12 @@ struct RootView: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: session.state)
-        .task { await session.restore() }
+        .task {
+            if case .loading = session.state { await session.restore() }
+        }
+        .task(id: perfilActivo) {
+            guard let perfilActivo else { return }
+            await session.registrarConexionApp(perfilID: perfilActivo)
+        }
     }
 }

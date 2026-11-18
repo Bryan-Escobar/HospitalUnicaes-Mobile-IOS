@@ -78,6 +78,7 @@ struct PreviewMeService: MeService {
     var me: Me
 
     func fetchMe() async throws -> Me { me }
+    func registrarConexionApp() async throws -> Date { Date() }
     func registrar(_ request: RegistroPacienteRequest) async throws -> Me { me }
 }
 
