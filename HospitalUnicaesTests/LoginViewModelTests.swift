@@ -76,4 +76,87 @@ struct LoginViewModelTests {
         #expect(viewModel.errorMessage?.contains("no tiene un perfil") == true)
         #expect(auth.signOutCount == 1)
     }
+
+    @Test func mientrasEnviaMuestraElCargandoYNoReenvia() async {
+        let (viewModel, _) = makeViewModel()
+        let gate = AsyncGate()
+        auth.signInGate = gate
+        viewModel.email = "doctor@demo.test"
+        viewModel.password = "Hospital2026"
+
+        let envio = Task { await viewModel.signIn() }
+        await esperar { viewModel.isLoading }
+        #expect(viewModel.isLoading)
+        #expect(!viewModel.canSubmit)
+
+        await viewModel.signIn()
+        gate.open()
+        await envio.value
+
+        #expect(auth.signInCalls.count == 1)
+        #expect(!viewModel.isLoading)
+    }
+
+    @Test func sinCamposNoLlamaAlServicio() async {
+        let (viewModel, _) = makeViewModel()
+
+        await viewModel.signIn()
+
+        #expect(auth.signInCalls.isEmpty)
+        #expect(viewModel.errorMessage == nil)
+    }
+
+    @Test func sinInternetPideRevisarLaConexion() async {
+        let (viewModel, session) = makeViewModel()
+        auth.signInResult = .failure(URLError(.notConnectedToInternet))
+        viewModel.email = "doctor@demo.test"
+        viewModel.password = "x"
+
+        await viewModel.signIn()
+
+        #expect(viewModel.errorMessage == "No hay conexión. Revisa tu internet e intenta de nuevo.")
+        #expect(session.state == .signedOut)
+    }
+
+    @Test func siLaApiFallaTrasElLoginSeCierraLaSesionYSeInformaElError() async {
+        let (viewModel, session) = makeViewModel()
+        me.meResult = .failure(APIError(statusCode: 500, code: "HTTP_500"))
+        viewModel.email = "doctor@demo.test"
+        viewModel.password = "x"
+
+        await viewModel.signIn()
+
+        #expect(viewModel.errorMessage == "El servidor del hospital no está disponible en este momento. Intenta más tarde.")
+        #expect(auth.signOutCount == 1)
+        #expect(session.state == .signedOut)
+    }
+
+    @Test func reintentarTrasUnErrorLimpiaElMensaje() async {
+        let (viewModel, session) = makeViewModel()
+        auth.signInResult = .failure(AuthServiceError.invalidCredentials)
+        viewModel.email = "doctor@demo.test"
+        viewModel.password = "mala"
+        await viewModel.signIn()
+        #expect(viewModel.errorMessage != nil)
+
+        auth.signInResult = .success(AppUser(id: UUID(), email: "doctor@demo.test"))
+        viewModel.password = "Hospital2026"
+        await viewModel.signIn()
+
+        #expect(viewModel.errorMessage == nil)
+        if case .signedIn = session.state {} else { Issue.record("Se esperaba una sesión iniciada") }
+    }
+
+    @Test func administradorNoEntraALaApp() async {
+        let (viewModel, session) = makeViewModel()
+        let admin = Me.fixture(rol: .administrador)
+        me.meResult = .success(admin)
+        viewModel.email = "admin@demo.test"
+        viewModel.password = "x"
+
+        await viewModel.signIn()
+
+        #expect(session.state == .accesoNoDisponible(admin))
+        #expect(viewModel.errorMessage == nil)
+    }
 }

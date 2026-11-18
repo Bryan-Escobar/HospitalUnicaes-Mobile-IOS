@@ -87,6 +87,40 @@ struct DoctorInicioViewModelTests {
         #expect(vm.resumen.proximaCita?.motivo == "Control de alergia")
     }
 
+    @Test func sinTurnoEnCursoMuestraElSiguienteDeHoy() async {
+        let s = Servicios()
+        s.turnos.result = .success([turno(desde: 3600, hasta: 7200, area: "Emergencia")])
+        let vm = viewModel(s)
+
+        await vm.cargar()
+
+        #expect(vm.resumen.turno?.area == "Emergencia")
+    }
+
+    @Test func sinCitasProximasNoHayProximaCita() async {
+        let s = Servicios()
+        s.citas.citasResult = .success([
+            DoctorFixtures.cita(fecha: ahora.addingTimeInterval(-600), estado: .programada),
+            DoctorFixtures.cita(fecha: ahora.addingTimeInterval(600), estado: .cancelada),
+        ])
+        let vm = viewModel(s)
+
+        await vm.cargar()
+
+        #expect(vm.resumen.proximaCita == nil)
+        #expect(vm.errorParcial == nil)
+    }
+
+    @Test func laProximaCitaSinMotivoDiceSinMotivo() async {
+        let s = Servicios()
+        s.citas.citasResult = .success([DoctorFixtures.cita(fecha: ahora.addingTimeInterval(600), motivo: nil)])
+        let vm = viewModel(s)
+
+        await vm.cargar()
+
+        #expect(vm.resumen.proximaCita?.motivo == "Sin motivo")
+    }
+
     @Test func laboratorioSoloCuentaExamenesQueElDoctorOrdeno() async throws {
         let s = Servicios()
         let propio = try #require(me.personal?.id)

@@ -34,6 +34,44 @@ struct LaboratorioPacienteViewModelTests {
         #expect(viewModel.aviso == nil)
     }
 
+    @Test func alInicioEstaCargandoYSinConexion() {
+        let viewModel = viewModel()
+
+        #expect(viewModel.estado == .cargando)
+        #expect(viewModel.examenes.isEmpty)
+        #expect(viewModel.conexion == .reconnecting)
+    }
+
+    @Test func unEventoRecuperaLaListaDespuesDeUnErrorInicial() async {
+        service.ordenesResult = .failure(URLError(.notConnectedToInternet))
+        let viewModel = viewModel()
+        let task = await escuchando(viewModel)
+        defer { task.cancel() }
+        #expect(viewModel.estado == .error(LaboratorioPacienteViewModel.mensajeError))
+
+        service.ordenesResult = .success(ordenes(.pendiente))
+        realtime.enviar(.examenCambio)
+        await esperar { viewModel.estado == .listo }
+
+        #expect(viewModel.estado == .listo)
+        #expect(viewModel.examenes.count == 1)
+    }
+
+    @Test func alCerrarseElCanalVuelveAReconectando() async {
+        service.ordenesResult = .success(ordenes(.pendiente))
+        let viewModel = viewModel()
+        let task = await escuchando(viewModel)
+        realtime.enviar(.conexion(.live))
+        await esperar { viewModel.conexion == .live }
+        #expect(viewModel.conexion == .live)
+
+        realtime.terminar()
+        await task.value
+
+        #expect(viewModel.conexion == .reconnecting)
+        #expect(viewModel.examenes.count == 1)
+    }
+
     @Test func sinOrdenesQuedaListoYVacio() async {
         let viewModel = viewModel()
         await viewModel.recargar()
