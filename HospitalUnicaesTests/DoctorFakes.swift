@@ -39,8 +39,22 @@ final class FakePacientesService: PacientesService, @unchecked Sendable {
 
 final class FakeHospitalizacionesService: HospitalizacionesService, @unchecked Sendable {
     var result: Result<Hospitalizacion?, Error> = .success(nil)
+    /// Movimientos del detalle; si falla, `detalle(id:)` lanza.
+    var movimientosResult: Result<[MovimientoCama], Error> = .success([])
+    private(set) var pacienteIds: [UUID] = []
+    private(set) var detalleIds: [UUID] = []
+
     func activa(pacienteId: UUID) async throws -> Hospitalizacion? {
-        try result.get()
+        pacienteIds.append(pacienteId)
+        return try result.get()
+    }
+
+    func detalle(id: UUID) async throws -> HospitalizacionDetalle {
+        detalleIds.append(id)
+        guard let hospitalizacion = try result.get() else {
+            throw APIError(statusCode: 404, code: "NO_ENCONTRADO")
+        }
+        return HospitalizacionDetalle(hospitalizacion: hospitalizacion, movimientos: try movimientosResult.get())
     }
 }
 
