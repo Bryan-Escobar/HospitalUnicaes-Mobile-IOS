@@ -38,6 +38,7 @@ jobs:
               - 'Config/**'
               - '.swiftlint.yml'
               - '.github/workflows/ios.yml'
+              - '.github/scripts/**'
 
   build-test:
     name: Build, tests y SwiftLint (iOS)
@@ -72,12 +73,11 @@ jobs:
       # Config/Secrets.xcconfig no existe en CI: Dev.xcconfig lo incluye con
       # `#include?`, así que compila con valores vacíos.
       - name: Elegir simulador
+        # A veces -showdestinations sale vacío recién elegido Xcode; el script reintenta y,
+        # si hace falta, toma o crea un iPhone con simctl.
         run: |
-          id=$(xcodebuild -project HospitalUnicaes.xcodeproj -scheme HospitalUnicaes \
-                 -clonedSourcePackagesDirPath "$SPM_DIR" -showdestinations 2>/dev/null \
-               | grep 'platform:iOS Simulator' | grep 'name:iPhone' | head -1 \
-               | sed -E 's/.*id:([^,]+),.*/\1/')
-          if [ -z "$id" ]; then echo "::error::No hay simulador de iPhone disponible"; exit 1; fi
+          id=$(bash .github/scripts/elegir-simulador.sh HospitalUnicaes.xcodeproj HospitalUnicaes "$SPM_DIR") \
+            || { echo "::error::No hay simulador de iPhone disponible"; exit 1; }
           echo "SIM_ID=$id" >> "$GITHUB_ENV"
           echo "Simulador: $id"
 
