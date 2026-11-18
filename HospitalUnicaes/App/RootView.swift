@@ -8,7 +8,7 @@ struct RootView: View {
 
     var body: some View {
         let perfilActivo = scenePhase == .active ? session.perfilActivoID : nil
-        Group {
+        ZStack {
             switch session.state {
             case .loading:
                 SplashView()
@@ -33,7 +33,7 @@ struct RootView: View {
         }
         .task(id: perfilActivo) {
             guard let perfilActivo else { return }
-            await session.registrarConexionApp(perfilID: perfilActivo)
+            await session.mantenerConexionApp(perfilID: perfilActivo)
         }
     }
 }

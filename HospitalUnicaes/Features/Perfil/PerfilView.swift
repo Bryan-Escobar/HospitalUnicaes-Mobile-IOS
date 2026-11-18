@@ -12,8 +12,8 @@ struct PerfilView: View {
                 VStack(spacing: DSSpacing.medium) {
                     header
                     datos
-                    if session.errorConexionApp {
-                        Text("No se pudo registrar la conexión.")
+                    if let aviso = session.errorConexionApp {
+                        Text(aviso)
                             .font(DSFont.bodySecondary)
                             .foregroundStyle(DSColor.textSecondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
