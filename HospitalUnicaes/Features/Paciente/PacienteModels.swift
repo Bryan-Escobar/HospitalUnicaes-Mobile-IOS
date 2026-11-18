@@ -1,7 +1,7 @@
 import Foundation
 
-// Modelos de la app del paciente. Mientras no existan los endpoints del paciente,
-// `PacienteMuestra` arma los datos del Figma con fechas relativas a hoy.
+// Modelos de la app del paciente. `PacienteMuestra` arma con fechas relativas a hoy los datos
+// del Figma que todavía no vienen de la API (habitación hasta HUNI-94) y los de los Previews.
 
 struct CitaPaciente: Hashable, Identifiable {
     var id = UUID()
@@ -20,20 +20,55 @@ struct SolicitudCita: Hashable, Identifiable {
     let preferencia: String
 }
 
+/// Un medicamento de una receta, con dosis, frecuencia, duración e indicaciones en una línea.
 struct RecetaPaciente: Hashable, Identifiable {
-    let id = UUID()
+    /// Id del detalle de la receta.
+    let id: UUID
     let medicamento: String
     let indicacion: String
 }
 
+/// Una consulta del historial clínico propio (iOS-P5 / P6, HUNI-60).
 struct ConsultaPaciente: Hashable, Identifiable {
-    let id = UUID()
+    let id: UUID
     let fecha: Date
     let diagnostico: String
+    /// Nombre completo del doctor, sin título (la API no trae sexo ni título).
     let doctor: String
-    let especialidad: String
+    let especialidad: String?
     let recetas: [RecetaPaciente]
-    let ordenes: [ExamenLaboratorioPaciente]
+    /// Exámenes de las órdenes de la consulta; `nil` si no se pudieron cargar.
+    let ordenes: [ExamenLaboratorioPaciente]?
+
+    /// "Ana Rivas · Alergología".
+    var detalleDoctor: String { Formatting.unir([doctor, especialidad]) }
+}
+
+extension ConsultaPaciente {
+    /// Consulta del historial de la API. `ordenesLaboratorio` (`GET laboratorio/ordenes`) aporta el
+    /// detalle por examen de las órdenes que la consulta solo resume; `nil` si esa carga falló.
+    init(_ consulta: ConsultaDetalle, ordenesLaboratorio: [OrdenLaboratorioPaciente]?) {
+        let ids = Set(consulta.ordenesLaboratorio.map(\.id))
+        self.init(
+            id: consulta.id,
+            fecha: consulta.fecha,
+            diagnostico: consulta.tituloDiagnostico,
+            doctor: consulta.doctor.nombreCompleto,
+            especialidad: consulta.doctor.especialidad?.nilIfBlank,
+            recetas: consulta.recetas.flatMap { receta in
+                receta.detalles.map { detalle in
+                    RecetaPaciente(
+                        id: detalle.id,
+                        medicamento: detalle.medicamento,
+                        indicacion: Formatting.unir([
+                            detalle.dosis, detalle.frecuencia, detalle.duracion, receta.indicaciones,
+                        ])
+                    )
+                }
+            },
+            ordenes: ordenesLaboratorio?.filter { ids.contains($0.id) }.filasLaboratorio
+        )
+    }
 }
 
 struct HabitacionPaciente: Hashable {
@@ -167,39 +202,6 @@ enum PacienteMuestra {
         )
     }
 
-    static func consultas(hoy: Date) -> [ConsultaPaciente] {
-        let prueba = resultados(hoy: hoy)[0]
-        return [
-            ConsultaPaciente(
-                fecha: Formatting.sumarDias(-7, a: hoy),
-                diagnostico: "Rinitis alérgica estacional",
-                doctor: "Dra. Ana Rivas",
-                especialidad: "Alergista",
-                recetas: [
-                    RecetaPaciente(medicamento: "Loratadina 10 mg", indicacion: "1 tableta cada 24 h · 14 días"),
-                    RecetaPaciente(medicamento: "Fluticasona nasal", indicacion: "2 aplicaciones cada 12 h"),
-                ],
-                ordenes: [prueba]
-            ),
-            ConsultaPaciente(
-                fecha: Formatting.sumarDias(-49, a: hoy),
-                diagnostico: "Dermatitis de contacto",
-                doctor: "Dr. Carlos Molina",
-                especialidad: "General",
-                recetas: [RecetaPaciente(medicamento: "Hidrocortisona crema 1 %", indicacion: "Cada 12 h · 7 días")],
-                ordenes: []
-            ),
-            ConsultaPaciente(
-                fecha: Formatting.sumarDias(-110, a: hoy),
-                diagnostico: "Control general",
-                doctor: "Dr. Carlos Molina",
-                especialidad: "General",
-                recetas: [],
-                ordenes: []
-            ),
-        ]
-    }
-
     static func habitacion(hoy: Date) -> HabitacionPaciente {
         HabitacionPaciente(
             codigo: "HAB-204",
@@ -211,6 +213,4 @@ enum PacienteMuestra {
             trasladoDesde: "HAB-202 · Cama B"
         )
     }
-
-    static let alergias = "penicilina, polen"
 }

@@ -11,6 +11,7 @@ extension PacienteDependencies {
     ) -> PacienteDependencies {
         PacienteDependencies(
             citas: PreviewCitasPacienteService(),
+            historial: PreviewHistorialPacienteService(),
             laboratorio: PreviewLaboratorioPacienteService(),
             laboratorioRealtime: PreviewLaboratorioRealtime(),
             resultadoArchivos: PreviewResultadoArchivoService(),
@@ -29,10 +30,18 @@ enum PacientePreviewData {
         nombres: "Ana", apellidos: "Rivas", especialidad: "Alergología"
     )
 
+    static let doctorMolina = DoctorResumen(
+        id: UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-000000000002") ?? UUID(),
+        nombres: "Carlos", apellidos: "Molina", especialidad: "Medicina general"
+    )
+
+    /// Orden de la prueba cutánea: la pidió la consulta de rinitis del historial de ejemplo.
+    static let ordenPruebaCutaneaId = UUID(uuidString: "ffffffff-ffff-4fff-8fff-000000000001") ?? UUID()
+
     /// Prueba cutánea (Completada), química sanguínea (En Proceso) y orina (Pendiente).
     static func ordenes(hoy: Date = Date()) -> [OrdenLaboratorioPaciente] {
         [
-            orden(dias: -7, examenes: [
+            orden(id: ordenPruebaCutaneaId, dias: -7, examenes: [
                 examen("Prueba cutánea de alergias", estado: .completado, dia: -7, resultado: ResultadoExamen(
                     id: UUID(),
                     valor: "Positivo a ácaros del polvo y polen de gramíneas. Negativo a epitelio de gato.",
@@ -47,9 +56,11 @@ enum PacientePreviewData {
         ]
     }
 
-    private static func orden(dias: Int, examenes: [OrdenExamenPaciente], hoy: Date) -> OrdenLaboratorioPaciente {
+    private static func orden(
+        id: UUID = UUID(), dias: Int, examenes: [OrdenExamenPaciente], hoy: Date
+    ) -> OrdenLaboratorioPaciente {
         OrdenLaboratorioPaciente(
-            id: UUID(), fechaSolicitud: Formatting.fecha(Formatting.sumarDias(dias, a: hoy), hora: 10, minuto: 40),
+            id: id, fechaSolicitud: Formatting.fecha(Formatting.sumarDias(dias, a: hoy), hora: 10, minuto: 40),
             prioridad: .normal, estado: .pendiente, doctor: doctorRivas, indicaciones: nil, examenes: examenes
         )
     }
@@ -63,6 +74,70 @@ enum PacientePreviewData {
             fechaInicio: estado == .pendiente ? nil : Formatting.fecha(base, hora: 11, minuto: 10),
             fechaCompletado: resultado?.fechaResultado, resultado: resultado
         )
+    }
+
+    /// Historial del Figma: rinitis (con recetas y la prueba cutánea), dermatitis y un control general.
+    static func historial(pacienteId: UUID, hoy: Date = Date()) -> HistorialClinico {
+        let paciente = Paciente(
+            id: pacienteId, perfilId: nil, nombres: "Carlos", apellidos: "Martínez",
+            documentoIdentidad: "01234567-8", fechaNacimiento: "1992-03-14", sexo: .masculino,
+            telefono: "7000-1111", direccion: nil, contactoEmergencia: nil, telefonoEmergencia: nil,
+            numeroExpediente: "EXP-2026-00015", activo: true, createdAt: hoy
+        )
+        return HistorialClinico(
+            paciente: paciente,
+            expediente: Expediente(
+                id: UUID(), pacienteId: pacienteId, numeroExpediente: paciente.numeroExpediente,
+                tipoSangre: "O+", alergias: "penicilina, polen", antecedentes: nil, enfermedadesCronicas: nil,
+                createdAt: hoy, updatedAt: hoy
+            ),
+            consultas: [
+                consulta(paciente, doctorRivas, dias: -7, diagnostico: "Rinitis alérgica estacional", recetas: [
+                    medicamento("Loratadina 10 mg", "1 tableta cada 24 h", "14 días"),
+                    medicamento("Fluticasona nasal", "2 aplicaciones cada 12 h"),
+                ], ordenes: [
+                    OrdenLaboratorioResumen(
+                        id: ordenPruebaCutaneaId,
+                        fechaSolicitud: Formatting.fecha(Formatting.sumarDias(-7, a: hoy), hora: 10, minuto: 40),
+                        prioridad: .normal, estado: .completado, totalExamenes: 1
+                    ),
+                ], hoy: hoy),
+                consulta(paciente, doctorMolina, dias: -49, diagnostico: "Dermatitis de contacto", recetas: [
+                    medicamento("Hidrocortisona crema 1 %", "Cada 12 h", "7 días"),
+                ], hoy: hoy),
+                consulta(paciente, doctorMolina, dias: -110, diagnostico: "Control general", hoy: hoy),
+            ]
+        )
+    }
+
+    private static func consulta(
+        _ paciente: Paciente,
+        _ doctor: DoctorResumen,
+        dias: Int,
+        diagnostico: String,
+        recetas: [RecetaDetalleItem] = [],
+        ordenes: [OrdenLaboratorioResumen] = [],
+        hoy: Date
+    ) -> ConsultaDetalle {
+        let fecha = Formatting.fecha(Formatting.sumarDias(dias, a: hoy), hora: 10)
+        return ConsultaDetalle(
+            id: UUID(), expedienteId: UUID(),
+            paciente: PersonaResumen(id: paciente.id, nombres: paciente.nombres, apellidos: paciente.apellidos),
+            doctor: doctor, citaId: nil, fecha: fecha, motivoConsulta: nil, signosVitales: nil,
+            examenFisico: nil, notas: nil, cerradaEn: fecha.addingTimeInterval(1_800),
+            diagnosticos: [Diagnostico(id: UUID(), codigoCie10: nil, descripcion: diagnostico, tipo: .principal)],
+            recetas: recetas.isEmpty ? [] : [
+                RecetaEmitida(
+                    id: UUID(), fechaEmision: fecha, indicaciones: nil,
+                    detalles: recetas
+                ),
+            ],
+            ordenesLaboratorio: ordenes
+        )
+    }
+
+    private static func medicamento(_ nombre: String, _ frecuencia: String, _ duracion: String? = nil) -> RecetaDetalleItem {
+        RecetaDetalleItem(id: UUID(), medicamento: nombre, dosis: nil, frecuencia: frecuencia, duracion: duracion)
     }
 
     static let ambulanciaId = UUID(uuidString: "eeeeeeee-eeee-4eee-8eee-000000000001") ?? UUID()
@@ -136,6 +211,13 @@ struct PreviewLaboratorioPacienteService: LaboratorioPacienteService {
 
     func urlArchivo(ordenId: UUID, examenId: UUID) async throws -> ArchivoFirmado {
         throw APIError(statusCode: 404, code: "NO_ENCONTRADO")
+    }
+}
+
+/// Historial de ejemplo del Figma con alergias, recetas y la orden de la prueba cutánea.
+struct PreviewHistorialPacienteService: HistorialPacienteService {
+    func historial(pacienteId: UUID) async throws -> HistorialClinico {
+        PacientePreviewData.historial(pacienteId: pacienteId)
     }
 }
 
