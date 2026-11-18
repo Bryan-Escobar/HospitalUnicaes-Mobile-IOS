@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// iOS-P5 / P7 / P9 Mi salud. El laboratorio se escucha en vivo mientras la pestaña
-/// está visible y la app activa; el canal sigue abierto al entrar a iOS-P8.
+/// iOS-P5 / P7 / P9 Mi salud. El historial se carga al abrir la pestaña y con pull-to-refresh;
+/// el laboratorio se escucha en vivo mientras la pestaña está visible y la app activa
+/// (el canal sigue abierto al entrar a iOS-P8).
 struct MiSaludView: View {
     @Bindable var viewModel: MiSaludViewModel
     let laboratorio: LaboratorioPacienteViewModel
@@ -28,7 +29,11 @@ struct MiSaludView: View {
                 .pantallaPrincipal()
             }
             .refreshable {
-                if viewModel.segmento == .laboratorio { await laboratorio.recargar() }
+                switch viewModel.segmento {
+                case .historial: await viewModel.recargar()
+                case .laboratorio: await laboratorio.recargar()
+                case .habitacion: break
+                }
             }
             .background(DSColor.backgroundGrouped)
             .navigationTitle("Mi salud")
@@ -49,6 +54,7 @@ struct MiSaludView: View {
             }
             .navigationDestination(for: PacienteRoute.self) { PacienteDestination(route: $0) }
         }
+        .task { await viewModel.cargarSiHaceFalta() }
         .task(id: escuchando) {
             if escuchando { await laboratorio.escuchar() }
         }
@@ -64,23 +70,52 @@ struct MiSaludView: View {
 
     @ViewBuilder
     private var historial: some View {
-        if let alergias = viewModel.alergias {
-            AlergiaBanner(texto: "Alergias: \(alergias)")
-        }
-        if viewModel.consultas.isEmpty {
-            ContentUnavailableView("Sin consultas registradas", systemImage: "text.page")
-        } else {
-            ListaTarjeta(items: viewModel.consultas) { consulta in
-                NavigationLink(value: PacienteRoute.consulta(consulta)) {
-                    ResumenRow(
-                        titulo: "\(Formatting.fechaCorta(consulta.fecha)) · \(consulta.diagnostico)",
-                        detalle: "\(consulta.doctor) · \(consulta.especialidad)",
-                        muestraChevron: true
-                    )
+        switch viewModel.estado {
+        case .cargando:
+            historialCargando
+        case .error(let mensaje):
+            VStack(spacing: DSSpacing.medium) {
+                DSBanner("\(mensaje) Revisa tu conexión e inténtalo de nuevo.", kind: .error)
+                DSButton("Reintentar", systemImage: "arrow.clockwise", kind: .secondary, size: .compact) {
+                    Task { await viewModel.recargar() }
                 }
-                .buttonStyle(.plain)
+            }
+        case .listo:
+            if let alergias = viewModel.alergias {
+                AlergiaBanner(texto: "Alergias: \(alergias)")
+            }
+            if viewModel.consultas.isEmpty {
+                ContentUnavailableView(
+                    "Sin consultas registradas",
+                    systemImage: "text.page",
+                    description: Text("Cuando un médico te atienda, verás aquí el diagnóstico y las recetas.")
+                )
+            } else {
+                ListaTarjeta(items: viewModel.consultas) { consulta in
+                    NavigationLink(value: PacienteRoute.consulta(consulta)) {
+                        ResumenRow(
+                            titulo: "\(Formatting.fechaCorta(consulta.fecha)) · \(consulta.diagnostico)",
+                            detalle: consulta.detalleDoctor,
+                            muestraChevron: true
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
+    }
+
+    private var historialCargando: some View {
+        ListaTarjeta(items: Array(0..<3).map(ConsultaCargando.init)) { _ in
+            ResumenRow(
+                titulo: "14 oct · Diagnóstico de la consulta",
+                detalle: "Nombre del médico · Especialidad",
+                muestraChevron: true
+            )
+        }
+        .redacted(reason: .placeholder)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Cargando…")
     }
 
     @ViewBuilder
@@ -102,6 +137,10 @@ struct MiSaludView: View {
             )
         }
     }
+}
+
+private struct ConsultaCargando: Identifiable {
+    let id: Int
 }
 
 private struct HabitacionCard: View {
@@ -149,7 +188,7 @@ struct DetalleConsultaPacienteView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: DSSpacing.medium) {
-                Text("\(consulta.doctor) · \(consulta.especialidad)")
+                Text(consulta.detalleDoctor)
                     .font(DSFont.bodySecondary)
                     .foregroundStyle(DSColor.textSecondary)
                 DSCard {
@@ -167,14 +206,20 @@ struct DetalleConsultaPacienteView: View {
                 }
                 DSCard {
                     Text("Órdenes de laboratorio").font(DSFont.subtitle)
-                    if consulta.ordenes.isEmpty {
-                        Text("Sin órdenes").font(DSFont.bodySecondary).foregroundStyle(DSColor.textSecondary)
-                    }
-                    ForEach(consulta.ordenes) { orden in
-                        NavigationLink(value: PacienteRoute.resultado(orden)) {
-                            ResumenRow(titulo: orden.nombre, status: orden.estado.status, muestraChevron: true)
+                    if let ordenes = consulta.ordenes {
+                        if ordenes.isEmpty {
+                            Text("Sin órdenes").font(DSFont.bodySecondary).foregroundStyle(DSColor.textSecondary)
                         }
-                        .buttonStyle(.plain)
+                        ForEach(ordenes) { orden in
+                            NavigationLink(value: PacienteRoute.resultado(orden)) {
+                                ResumenRow(titulo: orden.nombre, status: orden.estado.status, muestraChevron: true)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    } else {
+                        Text("No se pudieron cargar las órdenes. Desliza hacia abajo en Mi salud para reintentar.")
+                            .font(DSFont.bodySecondary)
+                            .foregroundStyle(DSColor.textSecondary)
                     }
                 }
             }
@@ -202,7 +247,11 @@ struct PacienteDestination: View {
 #Preview {
     let dependencies = PacienteDependencies.preview
     MiSaludView(
-        viewModel: MiSaludViewModel(),
+        viewModel: MiSaludViewModel(
+            pacienteId: UUID(),
+            historial: dependencies.historial,
+            laboratorio: dependencies.laboratorio
+        ),
         laboratorio: LaboratorioPacienteViewModel(
             service: dependencies.laboratorio,
             realtime: dependencies.laboratorioRealtime

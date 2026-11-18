@@ -54,7 +54,7 @@ struct DoctorTabView: View {
 struct PacienteTabView: View {
     let me: Me
     @State private var tab: PacienteTab = .inicio
-    @State private var miSalud = MiSaludViewModel()
+    @State private var miSalud: MiSaludViewModel
     @State private var laboratorio: LaboratorioPacienteViewModel
     @Environment(\.healthService) private var health
     private let dependencies: PacienteDependencies
@@ -62,6 +62,11 @@ struct PacienteTabView: View {
     init(me: Me, dependencies: PacienteDependencies) {
         self.me = me
         self.dependencies = dependencies
+        _miSalud = State(initialValue: MiSaludViewModel(
+            pacienteId: me.pacienteId,
+            historial: dependencies.historial,
+            laboratorio: dependencies.laboratorio
+        ))
         _laboratorio = State(initialValue: LaboratorioPacienteViewModel(
             service: dependencies.laboratorio,
             realtime: dependencies.laboratorioRealtime
