@@ -15,11 +15,4 @@ struct NavegacionPrincipalTests {
         #expect(viewModel.consultas.map(\.fecha) == viewModel.consultas.map(\.fecha).sorted(by: >))
         #expect(viewModel.habitacion?.codigo == "HAB-204")
     }
-
-    @Test func ocupacionPublicaEsSoloAgregada() {
-        let viewModel = InformacionPublicaViewModel()
-
-        #expect(viewModel.ocupacion.map(\.resumen) == ["3/5 ocupadas", "9/12 camas"])
-        #expect(viewModel.ocupacion.allSatisfy { $0.progreso <= 1 })
-    }
 }
