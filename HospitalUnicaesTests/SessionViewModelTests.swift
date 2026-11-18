@@ -49,9 +49,11 @@ struct SessionViewModelTests {
         #expect(session.state == .sessionExpired)
     }
 
-    @Test func registrarConexionActualizaElPerfilActivo() async throws {
+    @Test(arguments: UserRole.allCases)
+    func registrarConexionActualizaElPerfilActivo(rol: UserRole) async throws {
+        me.meResult = .success(.fixture(rol: rol))
         let session = makeSession()
-        try await session.signIn(email: "doctor@demo.test", password: "x")
+        try await session.signIn(email: "cuenta@demo.test", password: "x")
         let perfilID = try #require(session.perfilActivoID)
         let fecha = Date(timeIntervalSince1970: 1_800_000_000)
         me.conexionResult = .success(fecha)
@@ -60,7 +62,10 @@ struct SessionViewModelTests {
 
         #expect(me.conexionCount == 1)
         #expect(session.ultimaConexionAppAt == fecha)
-        #expect(!session.errorConexionApp)
+        #expect(session.errorConexionApp == nil)
+        var perfil = try me.meResult.get()
+        perfil.ultimaConexionAppAt = fecha
+        #expect(session.state == (rol.usesIOSApp ? .signedIn(perfil) : .accesoNoDisponible(perfil)))
     }
 
     @Test func unFalloDeConexionConservaElPerfilYSuUltimaConexion() async throws {
@@ -76,7 +81,43 @@ struct SessionViewModelTests {
 
         #expect(session.state == .signedIn(perfil))
         #expect(session.ultimaConexionAppAt == fechaAnterior)
-        #expect(session.errorConexionApp)
+        #expect(session.errorConexionApp != nil)
+    }
+
+    @Test func identificaUnaApiSinLaRutaDeConexion() async throws {
+        let perfil = Me.fixture(rol: .doctor)
+        me.meResult = .success(perfil)
+        me.conexionResult = .failure(APIError(statusCode: 404, code: "NO_ENCONTRADO"))
+        let session = makeSession()
+        try await session.signIn(email: "doctor@demo.test", password: "x")
+
+        await session.registrarConexionApp(perfilID: perfil.id)
+
+        #expect(session.errorConexionApp == "La API configurada todavía no tiene habilitado el registro de conexión.")
+        #expect(session.state == .signedIn(perfil))
+    }
+
+    @Test func reintentaYVuelveAReportarMientrasElPersonalTieneLaAppActiva() async throws {
+        let perfil = Me.fixture(rol: .doctor)
+        let fecha = Date(timeIntervalSince1970: 1_800_000_000)
+        me.meResult = .success(perfil)
+        me.conexionResult = .failure(URLError(.notConnectedToInternet))
+        let session = makeSession()
+        try await session.signIn(email: "doctor@demo.test", password: "x")
+        var pausas: [Duration] = []
+
+        await session.mantenerConexionApp(perfilID: perfil.id) { pausa in
+            pausas.append(pausa)
+            if pausas.count == 1 {
+                me.conexionResult = .success(fecha)
+            } else {
+                throw CancellationError()
+            }
+        }
+
+        #expect(pausas == [.seconds(15), .seconds(60)])
+        #expect(me.conexionCount == 2)
+        #expect(session.ultimaConexionAppAt == fecha)
     }
 
     @Test func meCon401LimpiaLaSesion() async {
