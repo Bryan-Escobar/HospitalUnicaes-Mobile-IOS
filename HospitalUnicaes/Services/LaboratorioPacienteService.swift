@@ -2,11 +2,9 @@ import Foundation
 
 /// Laboratorio visto por el paciente (HUNI-62). La API filtra por la sesión: con rol paciente
 /// solo devuelve sus órdenes, así que nunca se manda `paciente_id`.
-protocol LaboratorioPacienteService: Sendable {
+protocol LaboratorioPacienteService: ResultadoArchivoURLService {
     /// `GET laboratorio/ordenes`, todas las páginas.
     func misOrdenes() async throws -> [OrdenLaboratorioPaciente]
-    /// `GET laboratorio/ordenes/{ordenId}/examenes/{examenId}/resultado/archivo`.
-    func urlArchivo(ordenId: UUID, examenId: UUID) async throws -> ArchivoFirmado
 }
 
 struct APILaboratorioPacienteService: LaboratorioPacienteService {

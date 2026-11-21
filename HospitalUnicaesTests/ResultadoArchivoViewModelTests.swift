@@ -118,4 +118,15 @@ struct ResultadoArchivoViewModelTests {
         #expect(archivos.borrados == [local])
         #expect(viewModel.archivoLocal == nil)
     }
+
+    @Test func funcionaConLaboratorioServiceDelDoctor() async {
+        let doctorLab = FakeLaboratorioService()
+        let examen = LabFixtures.fila(estado: .completado)
+        let viewModel = ResultadoArchivoViewModel(examen: examen, service: doctorLab, archivos: archivos)
+
+        await viewModel.preparar(para: examen)
+
+        #expect(doctorLab.calls == ["urlArchivo"])
+        #expect(viewModel.archivoLocal != nil)
+    }
 }

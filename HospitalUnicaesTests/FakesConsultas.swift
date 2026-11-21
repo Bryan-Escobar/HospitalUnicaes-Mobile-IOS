@@ -50,12 +50,17 @@ final class FakeConsultasService: ConsultasService, @unchecked Sendable {
 
 final class FakeLaboratorioService: LaboratorioService, @unchecked Sendable {
     var examenesResult: Result<[ExamenCatalogo], Error> = .success([])
+    var ordenResult: Result<OrdenLaboratorioPaciente, Error> = .failure(
+        APIError(statusCode: 404, code: "NO_ENCONTRADO")
+    )
+    var archivoResult: Result<ArchivoFirmado, Error> = .success(LabFixtures.archivoFirmado())
     var failCall: (name: String, nth: Int)?
     var error: Error = APIError(statusCode: 500, code: "HTTP_500")
     var sink: CallSink?
     private(set) var calls: [String] = []
     private var counts: [String: Int] = [:]
     private(set) var ordenes: [CrearOrdenRequest] = []
+    private(set) var ordenesSolicitadas: [UUID] = []
 
     func examenes() async throws -> [ExamenCatalogo] {
         try gate("examenes")
@@ -66,6 +71,17 @@ final class FakeLaboratorioService: LaboratorioService, @unchecked Sendable {
         try gate("crearOrden")
         ordenes.append(body)
         return OrdenCreada(id: UUID(), estado: "pendiente")
+    }
+
+    func orden(id: UUID) async throws -> OrdenLaboratorioPaciente {
+        try gate("orden")
+        ordenesSolicitadas.append(id)
+        return try ordenResult.get()
+    }
+
+    func urlArchivo(ordenId: UUID, examenId: UUID) async throws -> ArchivoFirmado {
+        try gate("urlArchivo")
+        return try archivoResult.get()
     }
 
     private func gate(_ name: String) throws {

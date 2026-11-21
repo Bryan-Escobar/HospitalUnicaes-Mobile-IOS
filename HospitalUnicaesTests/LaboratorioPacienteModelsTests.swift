@@ -13,8 +13,21 @@ struct LaboratorioPacienteModelsTests {
         let completado = try #require(orden.examenes.first { $0.estado == .completado })
         #expect(completado.resultado?.tieneArchivo == true)
         #expect(completado.resultado?.unidad == "g/dL")
+        #expect(completado.resultado?.validadoPor?.nombreCompleto == "Rosa López")
         #expect(completado.fechaCompletado != nil)
         #expect(orden.examenes.first { $0.estado == .enProceso }?.resultado == nil)
+    }
+
+    @Test func decodificaTipoArchivoImagenYNombreDeArchivo() throws {
+        let json = paginaJSON.replacingOccurrences(
+            of: "\"tiene_archivo\": true,",
+            with: "\"tiene_archivo\": true, \"tipo_archivo\": \"imagen\","
+        )
+        let pagina = try APIClient.decoder.decode(Pagina<OrdenLaboratorioPaciente>.self, from: Data(json.utf8))
+        let fila = try #require(pagina.items.first?.filas.first { $0.estado == .completado })
+        #expect(fila.resultado?.tipoArchivo == .imagen)
+        #expect(fila.esImagen)
+        #expect(fila.nombreArchivo == "resultado-hemograma-completo.jpg")
     }
 
     @Test func estadoDesconocidoNoRompeLaDecodificacion() throws {

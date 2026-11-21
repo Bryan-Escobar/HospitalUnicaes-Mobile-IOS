@@ -18,6 +18,18 @@ struct DoctorDestination: View {
             )
         case .consulta(let consulta):
             DetalleConsultaView(consulta: consulta)
+        case .ordenLaboratorio(let ordenId):
+            DetalleOrdenLaboratorioView(
+                ordenId: ordenId,
+                laboratorio: dependencies.laboratorio
+            )
+        case .resultadoLaboratorio(let examen):
+            ResultadoExamenDetalleView(
+                examen: examen,
+                archivoService: dependencies.laboratorio,
+                archivos: dependencies.resultadoArchivos,
+                audiencia: .doctor
+            )
         }
     }
 }

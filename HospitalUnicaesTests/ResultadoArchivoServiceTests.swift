@@ -58,4 +58,29 @@ struct ResultadoArchivoServiceTests {
 
         #expect(!FileManager.default.fileExists(atPath: carpeta.path))
     }
+
+    @Test func descargaImagenPNGYAjustaExtension() async throws {
+        let png = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00])
+        let (servicio, _) = servicio { _ in (200, png) }
+        defer { servicio.borrar(nil) }
+
+        let local = try await servicio.descargar(firmada, nombreArchivo: "resultado-placa.jpg")
+
+        #expect(local == carpeta.appendingPathComponent("resultado-placa.png"))
+        #expect(FileManager.default.fileExists(atPath: local.path))
+    }
+
+    @Test func descargaImagenJPGYWebP() async throws {
+        let jpg = Data([0xFF, 0xD8, 0xFF, 0xE0])
+        let (servicioJpg, _) = servicio { _ in (200, jpg) }
+        defer { servicioJpg.borrar(nil) }
+        let localJpg = try await servicioJpg.descargar(firmada, nombreArchivo: "resultado-rx.jpg")
+        #expect(localJpg.pathExtension == "jpg")
+
+        let webp = Data("RIFF\u{00}\u{00}\u{00}\u{00}WEBP".utf8)
+        let (servicioWebp, _) = servicio { _ in (200, webp) }
+        defer { servicioWebp.borrar(nil) }
+        let localWebp = try await servicioWebp.descargar(firmada, nombreArchivo: "resultado-rx.jpg")
+        #expect(localWebp.pathExtension == "webp")
+    }
 }

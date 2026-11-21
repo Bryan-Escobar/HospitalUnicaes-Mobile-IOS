@@ -12,6 +12,7 @@ struct DoctorDependencies {
     var laboratorio: any LaboratorioService
     /// Órdenes de laboratorio que ve el doctor (`GET laboratorio/ordenes`), para los conteos de Inicio.
     var ordenesLaboratorio: any LaboratorioPacienteService
+    var resultadoArchivos: any ResultadoArchivoService
     var ambulancias: any AmbulanciaService
     var avisos: any AvisosService
     var onIniciarConsulta: @MainActor (Cita) -> Void
@@ -25,6 +26,7 @@ struct DoctorDependencies {
             consultas: APIConsultasService(client: api),
             laboratorio: APILaboratorioService(client: api),
             ordenesLaboratorio: APILaboratorioPacienteService(client: api),
+            resultadoArchivos: URLSessionResultadoArchivoService(),
             ambulancias: APIAmbulanciaService(client: api),
             avisos: APIAvisosService(client: api),
             onIniciarConsulta: { _ in }

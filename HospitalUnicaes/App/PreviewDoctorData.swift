@@ -12,6 +12,7 @@ extension DoctorDependencies {
             consultas: PreviewConsultasService(),
             laboratorio: PreviewLaboratorioService(),
             ordenesLaboratorio: PreviewOrdenesLaboratorioDoctorService(),
+            resultadoArchivos: PreviewResultadoArchivoService(),
             ambulancias: PreviewAmbulanciaService(estadoInicial: .enServicio, solicitudInicial: nil),
             avisos: PreviewAvisosService(),
             onIniciarConsulta: { _ in }
@@ -31,6 +32,7 @@ enum DoctorPreviewData {
     )
     static let doctor = UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-000000000001") ?? UUID()
     static let citaLuis = UUID(uuidString: "cccccccc-cccc-4ccc-8ccc-000000000001") ?? UUID()
+    static let ordenMarioId = UUID(uuidString: "ffffffff-ffff-4fff-8fff-000000000001") ?? UUID()
 
     static let pacientes: [Paciente] = [
         paciente(luis, "Luis", "Martínez", "01234567-8", "1992-03-14", "7000-1111"),
@@ -73,7 +75,56 @@ enum DoctorPreviewData {
             fecha: Date(), motivoConsulta: "Control", signosVitales: nil, examenFisico: nil,
             notas: "Sin datos de alarma.", cerradaEn: Date(),
             diagnosticos: [Diagnostico(id: UUID(), codigoCie10: "J30.1", descripcion: "Rinitis alérgica", tipo: .principal)],
-            recetas: [], ordenesLaboratorio: []
+            recetas: [],
+            ordenesLaboratorio: [
+                OrdenLaboratorioResumen(
+                    id: ordenMarioId,
+                    fechaSolicitud: Date().addingTimeInterval(-86_400),
+                    prioridad: .normal,
+                    estado: .enProceso,
+                    totalExamenes: 2
+                ),
+            ]
+        )
+    }
+
+    static var ordenMario: OrdenLaboratorioPaciente {
+        let ayer = Date().addingTimeInterval(-86_400)
+        return OrdenLaboratorioPaciente(
+            id: ordenMarioId,
+            fechaSolicitud: ayer,
+            prioridad: .normal,
+            estado: .enProceso,
+            doctor: DoctorResumen(id: doctor, nombres: "Ana", apellidos: "Rivas", especialidad: "Alergista"),
+            indicaciones: "Ayuno de 8 horas.",
+            examenes: [
+                OrdenExamenPaciente(
+                    id: UUID(),
+                    examen: .init(id: UUID(), nombre: "Hemograma completo", tipoMuestra: "Sangre venosa"),
+                    estado: .completado,
+                    fechaInicio: ayer.addingTimeInterval(3_600),
+                    fechaCompletado: ayer.addingTimeInterval(14_400),
+                    resultado: ResultadoExamen(
+                        id: UUID(),
+                        valor: "13.5",
+                        unidad: "g/dL",
+                        rangoReferencia: "12.0 - 15.5",
+                        observaciones: "Valores dentro de parámetros normales.",
+                        tieneArchivo: true,
+                        tipoArchivo: .pdf,
+                        validadoPor: PersonaResumen(id: UUID(), nombres: "Rosa", apellidos: "López"),
+                        fechaResultado: ayer.addingTimeInterval(14_400)
+                    )
+                ),
+                OrdenExamenPaciente(
+                    id: UUID(),
+                    examen: .init(id: UUID(), nombre: "Prueba cutánea de alergias", tipoMuestra: nil),
+                    estado: .enProceso,
+                    fechaInicio: ayer.addingTimeInterval(7_200),
+                    fechaCompletado: nil,
+                    resultado: nil
+                ),
+            ]
         )
     }
 
@@ -219,6 +270,14 @@ private struct PreviewLaboratorioService: LaboratorioService {
 
     func crearOrden(_ body: CrearOrdenRequest) async throws -> OrdenCreada {
         OrdenCreada(id: UUID(), estado: "pendiente")
+    }
+
+    func orden(id: UUID) async throws -> OrdenLaboratorioPaciente {
+        DoctorPreviewData.ordenMario
+    }
+
+    func urlArchivo(ordenId: UUID, examenId: UUID) async throws -> ArchivoFirmado {
+        throw APIError(statusCode: 404, code: "NO_ENCONTRADO")
     }
 }
 

@@ -31,6 +31,16 @@ struct OrdenExamenPaciente: Decodable, Hashable, Identifiable, Sendable {
     let resultado: ResultadoExamen?
 }
 
+enum TipoArchivoResultado: String, Decodable, Hashable, Sendable {
+    case pdf
+    case imagen
+    case desconocido
+
+    init(from decoder: Decoder) throws {
+        self = try EnumDecoding.value(TipoArchivoResultado.self, from: decoder, fallback: .desconocido)
+    }
+}
+
 struct ResultadoExamen: Decodable, Hashable, Sendable {
     let id: UUID
     let valor: String?
@@ -38,7 +48,31 @@ struct ResultadoExamen: Decodable, Hashable, Sendable {
     let rangoReferencia: String?
     let observaciones: String?
     let tieneArchivo: Bool
+    let tipoArchivo: TipoArchivoResultado?
+    let validadoPor: PersonaResumen?
     let fechaResultado: Date
+
+    init(
+        id: UUID,
+        valor: String?,
+        unidad: String?,
+        rangoReferencia: String?,
+        observaciones: String?,
+        tieneArchivo: Bool,
+        tipoArchivo: TipoArchivoResultado? = nil,
+        validadoPor: PersonaResumen? = nil,
+        fechaResultado: Date
+    ) {
+        self.id = id
+        self.valor = valor
+        self.unidad = unidad
+        self.rangoReferencia = rangoReferencia
+        self.observaciones = observaciones
+        self.tieneArchivo = tieneArchivo
+        self.tipoArchivo = tipoArchivo
+        self.validadoPor = validadoPor
+        self.fechaResultado = fechaResultado
+    }
 }
 
 /// URL firmada del PDF del resultado (válida 10 min).
@@ -63,8 +97,13 @@ struct ExamenLaboratorioPaciente: Hashable, Identifiable, Sendable {
     let fechaCompletado: Date?
     let resultado: ResultadoExamen?
 
-    /// "resultado-prueba-cutanea-de-alergias.pdf".
-    var nombreArchivo: String { "resultado-\(Formatting.slug(nombre)).pdf" }
+    var esImagen: Bool { resultado?.tipoArchivo == .imagen }
+
+    /// "resultado-prueba-cutanea-de-alergias.pdf" (o ".jpg" cuando es imagen; la extensión real se ajusta al descargar).
+    var nombreArchivo: String {
+        let ext = esImagen ? "jpg" : "pdf"
+        return "resultado-\(Formatting.slug(nombre)).\(ext)"
+    }
 
     var tieneArchivo: Bool { estado == .completado && resultado?.tieneArchivo == true }
 }

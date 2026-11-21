@@ -139,7 +139,10 @@ struct ExpedienteView: View {
         } else {
             VStack(spacing: DSSpacing.small) {
                 ForEach(viewModel.ordenes) { orden in
-                    OrdenRow(orden: orden)
+                    NavigationLink(value: DoctorRoute.ordenLaboratorio(ordenId: orden.id)) {
+                        OrdenRow(orden: orden)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -210,7 +213,7 @@ private struct OrdenRow: View {
     let orden: OrdenVisible
 
     var body: some View {
-        HStack {
+        HStack(spacing: DSSpacing.small) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Orden · \(Formatting.fechaCorta(orden.fecha))")
                     .font(DSFont.bodySecondaryEmphasis)
@@ -218,13 +221,18 @@ private struct OrdenRow: View {
                     .font(DSFont.footnote)
                     .foregroundStyle(DSColor.textSecondary)
             }
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .leading)
             DSStatusBadge(orden.estado.status)
+            Image(systemName: "chevron.right")
+                .font(DSFont.footnote)
+                .foregroundStyle(DSColor.textTertiary)
         }
         .padding(.vertical, 14)
         .padding(.horizontal, DSSpacing.regular)
         .dsCardBackground()
         .frame(minHeight: 52)
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Abre el detalle de la orden de laboratorio")
     }
 
     private var pie: String {

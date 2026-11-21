@@ -1,37 +1,53 @@
 import QuickLook
 import SwiftUI
 
-/// iOS-P8 Resultado de laboratorio. Lee la versión más nueva del examen desde el ViewModel
-/// de la lista, así que cambia sola a Completado si el laboratorio lo termina con la pantalla abierta.
+enum AudienciaResultado {
+    case paciente
+    case doctor
+}
+
+/// iOS-P8 Resultado de laboratorio (rol Paciente). Lee la versión más nueva del examen desde el
+/// ViewModel de la lista, así que cambia sola a Completado si el laboratorio lo termina con la pantalla abierta.
 struct ResultadoLaboratorioView: View {
     let examen: ExamenLaboratorioPaciente
     @Environment(LaboratorioPacienteViewModel.self) private var laboratorio: LaboratorioPacienteViewModel?
     @Environment(\.pacienteDependencies) private var dependencies
 
     var body: some View {
-        ResultadoLaboratorioContenido(
+        ResultadoExamenDetalleView(
             examen: laboratorio?.examen(id: examen.id) ?? examen,
             laboratorio: laboratorio,
-            archivo: ResultadoArchivoViewModel(
-                examen: examen,
-                service: dependencies.laboratorio,
-                archivos: dependencies.resultadoArchivos
-            )
+            archivoService: dependencies.laboratorio,
+            archivos: dependencies.resultadoArchivos,
+            audiencia: .paciente
         )
     }
 }
 
-private struct ResultadoLaboratorioContenido: View {
+/// Detalle reutilizable de un examen de laboratorio (usado por Paciente en iOS-P8 y por Doctor desde el expediente).
+struct ResultadoExamenDetalleView: View {
     let examen: ExamenLaboratorioPaciente
     let laboratorio: LaboratorioPacienteViewModel?
+    let audiencia: AudienciaResultado
     @State private var archivo: ResultadoArchivoViewModel
     @State private var vistaPrevia: URL?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    init(examen: ExamenLaboratorioPaciente, laboratorio: LaboratorioPacienteViewModel?, archivo: ResultadoArchivoViewModel) {
+    init(
+        examen: ExamenLaboratorioPaciente,
+        laboratorio: LaboratorioPacienteViewModel? = nil,
+        archivoService: any ResultadoArchivoURLService,
+        archivos: any ResultadoArchivoService,
+        audiencia: AudienciaResultado
+    ) {
         self.examen = examen
         self.laboratorio = laboratorio
-        _archivo = State(initialValue: archivo)
+        self.audiencia = audiencia
+        _archivo = State(initialValue: ResultadoArchivoViewModel(
+            examen: examen,
+            service: archivoService,
+            archivos: archivos
+        ))
     }
 
     var body: some View {
@@ -44,17 +60,22 @@ private struct ResultadoLaboratorioContenido: View {
                 Text(subtitulo)
                     .font(DSFont.footnote)
                     .foregroundStyle(DSColor.textSecondary)
+                if let muestra = examen.tipoMuestra?.nilIfBlank {
+                    Text("Muestra: \(muestra)")
+                        .font(DSFont.footnote)
+                        .foregroundStyle(DSColor.textSecondary)
+                }
                 if examen.estado == .completado {
                     completado
                 } else {
-                    ResultadoPendienteView(examen: examen)
+                    ResultadoPendienteView(examen: examen, audiencia: audiencia)
                 }
             }
             .foregroundStyle(DSColor.textPrimary)
             .pantallaPrincipal()
         }
         .background(DSColor.backgroundGrouped)
-        .navigationTitle("Laboratorio")
+        .navigationTitle("Resultado")
         .navigationBarTitleDisplayMode(.inline)
         .animation(reduceMotion ? nil : .default, value: examen.estado)
         .quickLookPreview($vistaPrevia)
@@ -79,12 +100,17 @@ private struct ResultadoLaboratorioContenido: View {
 
     @ViewBuilder
     private var completado: some View {
-        ResultadoTextoCard(resultado: examen.resultado)
+        ResultadoTextoCard(resultado: examen.resultado, esImagen: archivo.esImagen)
         if examen.tieneArchivo {
-            ResultadoPDFCard(nombreArchivo: examen.nombreArchivo, archivo: archivo)
+            ResultadoArchivoCard(archivo: archivo) {
+                if let local = archivo.archivoLocal { vistaPrevia = local }
+            }
             HStack(spacing: DSSpacing.medium) {
                 compartir
-                DSButton("Abrir PDF", systemImage: "doc.text") {
+                DSButton(
+                    archivo.esImagen ? "Abrir imagen" : "Abrir PDF",
+                    systemImage: archivo.esImagen ? "photo" : "doc.text"
+                ) {
                     vistaPrevia = archivo.archivoLocal
                 }
                 .disabled(archivo.archivoLocal == nil)
@@ -95,7 +121,7 @@ private struct ResultadoLaboratorioContenido: View {
     @ViewBuilder
     private var compartir: some View {
         if let local = archivo.archivoLocal {
-            ShareLink(item: local, preview: SharePreview(examen.nombreArchivo)) {
+            ShareLink(item: local, preview: SharePreview(archivo.nombreArchivoMostrado)) {
                 Label("Compartir", systemImage: "square.and.arrow.up")
             }
             .buttonStyle(DSButtonStyle(kind: .secondary))
@@ -106,9 +132,10 @@ private struct ResultadoLaboratorioContenido: View {
     }
 }
 
-/// Tarjeta "Resultado": valor con su unidad, rango de referencia y observaciones.
+/// Tarjeta "Resultado": valor con su unidad, rango de referencia, observaciones y quien validó.
 private struct ResultadoTextoCard: View {
     let resultado: ResultadoExamen?
+    let esImagen: Bool
 
     var body: some View {
         DSCard {
@@ -117,7 +144,7 @@ private struct ResultadoTextoCard: View {
                 Text([valor, resultado?.unidad?.nilIfBlank].compactMap { $0 }.joined(separator: " "))
                     .font(DSFont.body)
             } else {
-                Text("El resultado está en el PDF adjunto.")
+                Text(esImagen ? "El resultado está en la imagen adjunta." : "El resultado está en el PDF adjunto.")
                     .font(DSFont.body)
                     .foregroundStyle(DSColor.textSecondary)
             }
@@ -126,6 +153,9 @@ private struct ResultadoTextoCard: View {
             }
             if let observaciones = resultado?.observaciones?.nilIfBlank {
                 detalle("Observaciones", observaciones)
+            }
+            if let validado = resultado?.validadoPor?.nombreCompleto.nilIfBlank {
+                detalle("Validado por", validado)
             }
         }
     }
@@ -140,14 +170,19 @@ private struct ResultadoTextoCard: View {
     }
 }
 
-/// Tarjeta del PDF: miniatura de la primera página, nombre y tamaño.
-private struct ResultadoPDFCard: View {
-    let nombreArchivo: String
+/// Tarjeta del archivo adjunto (PDF o imagen): miniatura, nombre y tamaño.
+private struct ResultadoArchivoCard: View {
     let archivo: ResultadoArchivoViewModel
+    let onAbrir: () -> Void
 
     var body: some View {
         DSCard(spacing: DSSpacing.medium) {
-            vistaPrevia
+            Button(action: onAbrir) {
+                vistaPrevia
+            }
+            .buttonStyle(.plain)
+            .disabled(archivo.archivoLocal == nil)
+
             if case .error(let mensaje) = archivo.estado {
                 HStack(alignment: .firstTextBaseline) {
                     Text(mensaje)
@@ -160,12 +195,12 @@ private struct ResultadoPDFCard: View {
                 }
             }
             HStack(spacing: DSSpacing.medium) {
-                Image(systemName: "doc.richtext")
+                Image(systemName: archivo.esImagen ? "photo" : "doc.richtext")
                     .font(.title2)
-                    .foregroundStyle(DSColor.dangerText)
+                    .foregroundStyle(archivo.esImagen ? DSColor.tint : DSColor.dangerText)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(nombreArchivo)
+                    Text(archivo.nombreArchivoMostrado)
                         .font(DSFont.bodySecondaryEmphasis)
                         .lineLimit(2)
                     Text(detalle)
@@ -177,9 +212,13 @@ private struct ResultadoPDFCard: View {
         }
     }
 
+    private var etiquetaTipo: String {
+        archivo.esImagen ? "Imagen" : "PDF"
+    }
+
     private var detalle: String {
-        if case .listo(_, let tamano, _) = archivo.estado { return "PDF · \(tamano)" }
-        return "PDF"
+        if case .listo(_, let tamano, _) = archivo.estado { return "\(etiquetaTipo) · \(tamano)" }
+        return etiquetaTipo
     }
 
     private var vistaPrevia: some View {
@@ -193,9 +232,9 @@ private struct ResultadoPDFCard: View {
                     .padding(DSSpacing.small)
             } else {
                 VStack(spacing: DSSpacing.small) {
-                    Image(systemName: "doc.text")
+                    Image(systemName: archivo.esImagen ? "photo" : "doc.text")
                         .font(.largeTitle)
-                    Text("Vista previa del PDF")
+                    Text(archivo.esImagen ? "Vista previa de la imagen" : "Vista previa del PDF")
                         .font(DSFont.footnote)
                     if archivo.estado == .descargando {
                         ProgressView().controlSize(.small)
@@ -207,13 +246,18 @@ private struct ResultadoPDFCard: View {
         .frame(height: 220)
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(archivo.estado == .descargando ? "Descargando el PDF" : "Vista previa del PDF")
+        .accessibilityLabel(
+            archivo.estado == .descargando
+                ? "Descargando el archivo"
+                : (archivo.esImagen ? "Vista previa de la imagen" : "Vista previa del PDF")
+        )
     }
 }
 
-/// Examen Pendiente o En Proceso: línea de tiempo y "Tu resultado aún no está listo".
+/// Examen Pendiente o En Proceso: línea de tiempo y mensaje según el rol.
 private struct ResultadoPendienteView: View {
     let examen: ExamenLaboratorioPaciente
+    let audiencia: AudienciaResultado
 
     var body: some View {
         DSCard {
@@ -224,9 +268,13 @@ private struct ResultadoPendienteView: View {
             ])
         }
         ContentUnavailableView(
-            "Tu resultado aún no está listo",
+            audiencia == .paciente ? "Tu resultado aún no está listo" : "Resultado aún no disponible",
             systemImage: "hourglass",
-            description: Text("Te avisaremos cuando esté Completado.")
+            description: Text(
+                audiencia == .paciente
+                    ? "Te avisaremos cuando esté Completado."
+                    : "El laboratorio todavía no ha completado este examen."
+            )
         )
     }
 }

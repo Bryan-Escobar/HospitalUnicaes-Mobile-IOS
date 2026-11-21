@@ -111,17 +111,25 @@ struct DetalleConsultaView: View {
         DSCard {
             Text("Órdenes de laboratorio (\(consulta.ordenesLaboratorio.count))").font(DSFont.subtitle)
             ForEach(consulta.ordenesLaboratorio) { orden in
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Orden · creada \(Formatting.fechaCorta(orden.fechaSolicitud))")
-                            .font(DSFont.bodySecondaryEmphasis)
-                        Text(Formatting.cantidad(orden.totalExamenes, singular: "examen", plural: "exámenes"))
+                NavigationLink(value: DoctorRoute.ordenLaboratorio(ordenId: orden.id)) {
+                    HStack(spacing: DSSpacing.small) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Orden · creada \(Formatting.fechaCorta(orden.fechaSolicitud))")
+                                .font(DSFont.bodySecondaryEmphasis)
+                            Text(Formatting.cantidad(orden.totalExamenes, singular: "examen", plural: "exámenes"))
+                                .font(DSFont.footnote)
+                                .foregroundStyle(DSColor.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        DSStatusBadge(orden.estado.status)
+                        Image(systemName: "chevron.right")
                             .font(DSFont.footnote)
-                            .foregroundStyle(DSColor.textSecondary)
+                            .foregroundStyle(DSColor.textTertiary)
                     }
-                    Spacer()
-                    DSStatusBadge(orden.estado.status)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
             }
         }
     }
